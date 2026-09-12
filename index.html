@@ -46,32 +46,6 @@
       </div>
 
       <!-- COMPONENTE TASA BCV -->
-	async function fetchLiveBcvRate() {
-  const displayElement = document.getElementById('bcvRateDisplay');
-  
-  try {
-    const res = await fetch('https://ve.dolarapi.com/v1/dolares/oficial', { cache: 'no-store' });
-    const data = await res.json();
-    if (data && data.promedio) {
-      window.bcvRate = parseFloat(data.promedio);
-      if (displayElement) displayElement.textContent = `Bs. ${window.bcvRate.toFixed(2)}`;
-      return;
-    }
-  } catch (err) {
-    console.warn("Fallo API 1, intentando API 2...", err);
-  }
-
-  try {
-    const res = await fetch('https://pydolarvenezuela-api.vercel.app/api/v1/dollar?page=bcv');
-    const data = await res.json();
-    if (data && data.moneda) {
-      window.bcvRate = parseFloat(data.moneda);
-      if (displayElement) displayElement.textContent = `Bs. ${window.bcvRate.toFixed(2)}`;
-    }
-  } catch (err) {
-    if (displayElement) displayElement.textContent = "Bs. --";
-  }
-}
       <div class="flex items-center gap-1.5 bg-gray-800/80 px-2.5 py-0.5 rounded-full border border-gray-700">
         <span class="text-[11px] uppercase tracking-wider text-gray-400 font-semibold">BCV:</span>
         <span id="bcvRateDisplay" class="font-mono font-bold text-emerald-400 text-xs">Cargando...</span>
@@ -658,7 +632,7 @@
   </div>
 
   <!-- Vinculación de Módulos JavaScript Externos -->
-   <script type="module" src="./app.js"></script>
+  <script type="module" src="./app.js"></script>
   <script type="module" src="./supabaseClient.js"></script>
   <script type="module" src="./main.js"></script>
 </body>

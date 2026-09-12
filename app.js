@@ -35,8 +35,8 @@ async function fetchLiveBcvRate() {
       if (!responseFallback.ok) throw new Error("Falló API Respaldo");
 
       const dataFallback = await responseFallback.json();
-      if (dataFallback && dataFallback.monedas && dataFallback.monedas.usd) {
-        window.bcvRate = parseFloat(dataFallback.monedas.usd.promedio);
+      if (dataFallback && dataFallback.moneda) {
+        window.bcvRate = parseFloat(dataFallback.moneda);
         localStorage.setItem('avocado_last_bcv', window.bcvRate);
         updateBcvUI();
         renderStoreProducts();
@@ -924,36 +924,14 @@ window.updateBcvRatePrompt = () => {
   renderStoreProducts();
   updateCartUI();
 };
-async function fetchLiveBcvRate() {
-  const displayElement = document.getElementById('bcvRateDisplay');
-  
-  try {
-    const res = await fetch('https://ve.dolarapi.com/v1/dolares/oficial', { cache: 'no-store' });
-    const data = await res.json();
-    if (data && data.promedio) {
-      window.bcvRate = parseFloat(data.promedio);
-      if (displayElement) displayElement.textContent = `Bs. ${window.bcvRate.toFixed(2)}`;
-      return;
-    }
-  } catch (err) {
-    console.warn("Fallo API 1, intentando API 2...", err);
-  }
-
-  try {
-    const res = await fetch('https://pydolarvenezuela-api.vercel.app/api/v1/dollar?page=bcv');
-    const data = await res.json();
-    if (data && data.moneda) {
-      window.bcvRate = parseFloat(data.moneda);
-      if (displayElement) displayElement.textContent = `Bs. ${window.bcvRate.toFixed(2)}`;
-    }
-  } catch (err) {
-    if (displayElement) displayElement.textContent = "Bs. --";
-  }
-}
 
 function updateBcvUI() {
   const formattedRate = `Bs. ${window.bcvRate.toFixed(2)}`;
-  document.getElementById('bcvRateDisplay').textContent = formattedRate;
-  document.getElementById('bcvRateDisplayMobile').textContent = formattedRate;
-  document.getElementById('cartBcvRate').textContent = `${formattedRate} / USD`;
+  const displayDesktop = document.getElementById('bcvRateDisplay');
+  const displayMobile = document.getElementById('bcvRateDisplayMobile');
+  const displayCart = document.getElementById('cartBcvRate');
+
+  if (displayDesktop) displayDesktop.textContent = formattedRate;
+  if (displayMobile) displayMobile.textContent = formattedRate;
+  if (displayCart) displayCart.textContent = `${formattedRate} / USD`;
 }
