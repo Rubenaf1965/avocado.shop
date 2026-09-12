@@ -1,0 +1,638 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Avocado Shop | Insumos de uñas, cejas y pestañas</title>
+  
+  <!-- Estilos e Iconos -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  
+  <!-- Librerías de Generación PDF -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
+
+  <!-- SDK Cliente Supabase -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+  <style>
+    body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: #FAFAFA; }
+    .tab-btn.active { background-color: #059669; color: white; }
+
+    @media print {
+      body * { visibility: hidden; }
+      #printableArea, #printableArea *, #orderInvoicePrintArea, #orderInvoicePrintArea * { visibility: visible; }
+      #orderInvoicePrintArea { position: absolute; left: 0; top: 0; width: 100%; }
+      #printableArea { position: absolute; left: 0; top: 0; width: 100%; }
+      .no-print { display: none !important; }
+    }
+  </style>
+</head>
+<body class="text-gray-800">
+
+  <header class="sticky top-0 z-40 bg-white/90 backdrop-blur-md border-b border-gray-100 shadow-sm">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between gap-4">
+      
+      <!-- LOGO -->
+      <div class="flex flex-col cursor-pointer" onclick="switchTab('store')">
+        <div class="flex items-center gap-2">
+          <span class="text-2xl font-extrabold tracking-tight text-emerald-600">🥑 Avocado Shop</span>
+          <span class="text-xs bg-emerald-50 text-emerald-700 px-2.5 py-0.5 rounded-full font-semibold hidden sm:inline-block">Pro Nails</span>
+        </div>
+        <span class="text-[11px] font-semibold text-emerald-800 tracking-tight -mt-0.5">
+          Insumos de uñas, cejas y pestañas 🥑
+        </span>
+      </div>
+
+      <!-- COMPONENTE TASA BCV -->
+      <div class="flex items-center gap-1.5 bg-gray-800/80 px-2.5 py-0.5 rounded-full border border-gray-700">
+        <span class="text-[11px] uppercase tracking-wider text-gray-400 font-semibold">BCV:</span>
+        <span id="bcvRateDisplay" class="font-mono font-bold text-emerald-400 text-xs">Cargando...</span>
+      </div>
+
+      <div class="flex-1 max-w-xs sm:max-w-md">
+        <input type="text" id="searchInput" placeholder="Buscar geles, lámparas, brocas..." 
+               class="w-full bg-gray-100 text-sm rounded-full px-4 py-2 border-none focus:ring-2 focus:ring-emerald-500 outline-none transition">
+      </div>
+
+      <div class="flex items-center gap-3">
+        <button onclick="switchTab('store')" class="nav-link text-xs font-bold text-gray-600 hover:text-emerald-600 px-3 py-1.5 rounded-lg">Tienda</button>
+        <button onclick="switchTab('tracking')" class="nav-link text-xs font-bold text-gray-600 hover:text-emerald-600 px-3 py-1.5 rounded-lg">Rastreo</button>
+        <button onclick="switchTab('admin')" class="nav-link text-xs font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 px-3 py-1.5 rounded-lg">Panel Admin</button>
+
+        <button id="btnOpenCart" class="relative p-2 bg-gray-100 rounded-full hover:bg-gray-200 transition">
+          🛒 <span id="cartBadge" class="absolute -top-1 -right-1 bg-emerald-600 text-white text-[10px] font-bold w-4 h-4 rounded-full flex items-center justify-center">0</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+
+    <section id="tab-store" class="tab-content">
+      <div class="flex md:hidden items-center justify-between bg-emerald-50 border border-emerald-200 px-4 py-2 rounded-xl text-xs font-bold text-emerald-900 mb-4">
+        <span>🏛️ Tasa Oficial BCV: <strong id="bcvRateDisplayMobile" class="text-emerald-700">Cargando...</strong></span>
+        <button onclick="updateBcvRatePrompt()" class="bg-emerald-600 text-white text-[10px] px-2.5 py-1 rounded-md">Modificar</button>
+      </div>
+
+      <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+        <div class="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-none" id="categoryFilters">
+          <button class="cat-filter active px-4 py-2 rounded-full text-xs font-semibold bg-emerald-600 text-white" data-cat="all">Todos</button>
+          <button class="cat-filter px-4 py-2 rounded-full text-xs font-semibold bg-white text-gray-600 hover:bg-gray-100" data-cat="Preparadores y Bases">Preparadores y Bases</button>
+          <button class="cat-filter px-4 py-2 rounded-full text-xs font-semibold bg-white text-gray-600 hover:bg-gray-100" data-cat="Esmaltes Semipermanentes">Esmaltes Semi</button>
+          <button class="cat-filter px-4 py-2 rounded-full text-xs font-semibold bg-white text-gray-600 hover:bg-gray-100" data-cat="Sistemas Constructores">Sistemas Constructores</button>
+          <button class="cat-filter px-4 py-2 rounded-full text-xs font-semibold bg-white text-gray-600 hover:bg-gray-100" data-cat="Herramientas y Lámparas">Herramientas y Lámparas</button>
+        </div>
+
+        <div class="flex items-center gap-2 bg-emerald-50 px-3 py-1.5 rounded-xl border border-emerald-100">
+          <span class="text-xs font-bold text-emerald-800">📍 Sucursal:</span>
+          <select id="userBranchSelect" class="bg-transparent text-xs font-semibold text-emerald-900 outline-none cursor-pointer">
+            <option value="ALL">Todas las Sucursales</option>
+            <option value="San Félix">San Félix</option>
+            <option value="CC Alta Vista I">CC Alta Vista I</option>
+            <option value="CC Alta Vista II">CC Alta Vista II</option>
+          </select>
+        </div>
+      </div>
+
+      <div id="productGrid" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6"></div>
+    </section>
+
+    <section id="tab-tracking" class="tab-content hidden">
+      <div class="max-w-md mx-auto bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
+        <h2 class="text-xl font-bold text-center text-gray-800 mb-2">📦 Tracking de Pedidos</h2>
+        <p class="text-xs text-center text-gray-500 mb-6">Ingresa tu código de orden (ej: AVO-849201)</p>
+        
+        <div class="flex gap-2 mb-6">
+          <input type="text" id="trackInput" placeholder="AVO-XXXXXX" class="flex-1 border rounded-xl p-2.5 text-sm outline-none focus:ring-2 focus:ring-emerald-500">
+          <button onclick="searchOrderTracking()" class="bg-emerald-600 text-white font-bold px-4 py-2.5 rounded-xl hover:bg-emerald-700 text-sm">Consultar</button>
+        </div>
+
+        <div id="trackResult" class="hidden border-t pt-4">
+          <div class="flex justify-between items-center mb-3">
+            <span class="text-xs text-gray-500">Estado:</span>
+            <span id="trackStatus" class="text-xs font-bold bg-amber-50 text-amber-700 px-2.5 py-1 rounded-full">En Verificación</span>
+          </div>
+          <div class="text-xs text-gray-600 space-y-2">
+            <p><strong>Cliente:</strong> <span id="trackClient">------</span></p>
+            <p><strong>Método de Entrega:</strong> <span id="trackDeliveryType">------</span></p>
+            <p><strong>Sucursal/Dirección:</strong> <span id="trackBranch">------</span></p>
+            <p><strong>Referencia Pago Móvil:</strong> <span id="trackRef">------</span></p>
+            <p><strong>Total Orden:</strong> <span id="trackTotal">$0.00</span></p>
+          </div>
+          <button id="btnDownloadTrackInvoice" class="w-full mt-4 bg-slate-900 text-white text-xs font-bold py-2.5 rounded-xl hover:bg-black transition flex items-center justify-center gap-2">
+            📄 Descargar Factura PDF
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <section id="tab-admin" class="tab-content hidden">
+      <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+        <div>
+          <h1 class="text-2xl font-bold text-slate-900">🥑 Dashboard Administrativo</h1>
+          <p class="text-xs text-slate-500" id="adminHeaderSub">Control Multi-Sucursal de Inventario, Vendedores y Facturación</p>
+        </div>
+
+        <div class="flex flex-wrap items-center gap-2">
+          <button onclick="exportDataJSON()" class="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-sm">
+            📥 Exportar JSON
+          </button>
+          
+          <label for="importJsonInput" class="bg-amber-600 hover:bg-amber-700 text-white px-3 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-sm">
+            📤 Importar JSON
+          </label>
+          <input type="file" id="importJsonInput" accept=".json" class="hidden" onchange="importDataJSON(event)">
+
+          <div class="flex items-center gap-2 bg-white px-4 py-2 rounded-xl border border-slate-200 shadow-sm ml-auto md:ml-0">
+            <span class="text-xs font-bold text-slate-600">🔒 Acceso Sucursal:</span>
+            <select id="adminBranchFilter" onchange="handleBranchAccessChange(this)" class="bg-transparent text-xs font-bold text-slate-800 outline-none cursor-pointer">
+              <option value="ALL">Todas las Sucursales (Global)</option>
+              <option value="San Félix">San Félix</option>
+              <option value="CC Alta Vista I">CC Alta Vista I</option>
+              <option value="CC Alta Vista II">CC Alta Vista II</option>
+            </select>
+          </div>
+          <button onclick="logoutAdmin()" class="bg-red-50 text-red-600 hover:bg-red-100 px-3 py-2 rounded-xl text-xs font-bold transition">
+            🚪 Salir
+          </button>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+        <div class="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm">
+          <div class="flex justify-between items-center mb-2">
+            <span class="text-xs font-bold text-slate-500">San Félix</span>
+            <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
+          </div>
+          <p class="text-xl font-black text-slate-800" id="stat-sanfelix">$0.00</p>
+          <p class="text-[10px] text-slate-400 mt-1" id="stock-sanfelix">Stock: 0 unidades</p>
+        </div>
+
+        <div class="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm">
+          <div class="flex justify-between items-center mb-2">
+            <span class="text-xs font-bold text-amber-600">🛵 Ventas por Delivery</span>
+            <span class="w-2 h-2 rounded-full bg-amber-500"></span>
+          </div>
+          <p class="text-xl font-black text-slate-800" id="stat-delivery">$0.00</p>
+          <p class="text-[10px] text-slate-400 mt-1" id="count-delivery">0 pedidos registrados</p>
+        </div>
+
+        <div class="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm">
+          <div class="flex justify-between items-center mb-2">
+            <span class="text-xs font-bold text-slate-500">CC Alta Vista I</span>
+            <span class="w-2 h-2 rounded-full bg-blue-500"></span>
+          </div>
+          <p class="text-xl font-black text-slate-800" id="stat-altavista1">$0.00</p>
+          <p class="text-[10px] text-slate-400 mt-1" id="stock-altavista1">Stock: 0 unidades</p>
+        </div>
+
+        <div class="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm">
+          <div class="flex justify-between items-center mb-2">
+            <span class="text-xs font-bold text-slate-500">CC Alta Vista II</span>
+            <span class="w-2 h-2 rounded-full bg-purple-500"></span>
+          </div>
+          <p class="text-xl font-black text-slate-800" id="stat-altavista2">$0.00</p>
+          <p class="text-[10px] text-slate-400 mt-1" id="stock-altavista2">Stock: 0 unidades</p>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        
+        <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 h-fit">
+          <h2 class="text-md font-bold mb-4 text-slate-800">Subir Producto Nuevo</h2>
+          <form id="adminProductForm" onsubmit="handleCreateProduct(event)" class="space-y-3">
+            <div>
+              <label class="block text-xs font-semibold text-slate-600 mb-1">Nombre</label>
+              <input type="text" id="pName" required class="w-full border rounded-lg p-2 text-xs outline-none focus:ring-1 focus:ring-emerald-500">
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-slate-600 mb-1">Categoría</label>
+              <select id="pCategory" class="w-full border rounded-lg p-2 text-xs outline-none">
+                <option>Preparadores y Bases</option>
+                <option>Esmaltes Semipermanentes</option>
+                <option>Sistemas Constructores</option>
+                <option>Herramientas y Lámparas</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-slate-600 mb-1">Sucursal Destino</label>
+              <select id="pBranch" class="w-full border rounded-lg p-2 text-xs outline-none font-medium">
+                <option value="San Félix">San Félix</option>
+                <option value="CC Alta Vista I">CC Alta Vista I</option>
+                <option value="CC Alta Vista II">CC Alta Vista II</option>
+              </select>
+            </div>
+            <div class="grid grid-cols-2 gap-2">
+              <div>
+                <label class="block text-xs font-semibold text-slate-600 mb-1">Precio ($)</label>
+                <input type="number" step="0.01" id="pPrice" required class="w-full border rounded-lg p-2 text-xs outline-none">
+              </div>
+              <div>
+                <label class="block text-xs font-semibold text-slate-600 mb-1">Stock Inicial</label>
+                <input type="number" id="pStock" required class="w-full border rounded-lg p-2 text-xs outline-none">
+              </div>
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-slate-600 mb-1">URL de Imagen</label>
+              <input type="url" id="pImage" required placeholder="https://..." class="w-full border rounded-lg p-2 text-xs outline-none">
+            </div>
+            <button type="submit" class="w-full bg-emerald-600 text-white font-bold py-2.5 rounded-xl hover:bg-emerald-700 transition text-xs">Guardar Nuevo Producto</button>
+          </form>
+        </div>
+
+        <div class="lg:col-span-2 space-y-6">
+          <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-100">
+            <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-4">
+              <div>
+                <h3 class="text-sm font-bold text-slate-800">📋 Inventario de Productos</h3>
+                <p class="text-[11px] text-slate-400">Gestiona las existencias, edita, elimina ítems o genera reportes</p>
+              </div>
+              
+              <div class="flex items-center gap-2">
+                <button onclick="displayInventoryScreen()" class="bg-slate-800 text-white px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-black transition flex items-center gap-1.5">
+                  🖥️ Ver en Pantalla
+                </button>
+                <button onclick="printInventoryReport()" class="bg-emerald-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-emerald-700 transition flex items-center gap-1.5">
+                  🖨️ Imprimir / PDF
+                </button>
+              </div>
+            </div>
+
+            <div class="overflow-x-auto">
+              <table class="w-full text-left text-xs">
+                <thead class="bg-slate-50 text-slate-500 font-semibold">
+                  <tr>
+                    <th class="p-2.5">SKU</th>
+                    <th class="p-2.5">Producto</th>
+                    <th class="p-2.5">Categoría</th>
+                    <th class="p-2.5">Sucursal</th>
+                    <th class="p-2.5">Precio ($)</th>
+                    <th class="p-2.5">Stock</th>
+                    <th class="p-2.5">Estado</th>
+                    <th class="p-2.5 text-center">Acciones</th>
+                  </tr>
+                </thead>
+                <tbody id="inventoryTableBody" class="divide-y divide-slate-100"></tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-100">
+            <div class="flex justify-between items-center mb-3">
+              <h3 class="text-sm font-bold text-slate-800">Vendedores & Comisiones</h3>
+              <button onclick="addSellerPrompt()" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-3 py-1.5 rounded-lg transition flex items-center gap-1">
+                ➕ Agregar Vendedor
+              </button>
+            </div>
+            <div class="overflow-x-auto">
+              <table class="w-full text-left text-xs">
+                <thead class="bg-slate-50 text-slate-500 font-semibold">
+                  <tr>
+                    <th class="p-2.5">Vendedor</th>
+                    <th class="p-2.5">Sucursal</th>
+                    <th class="p-2.5">Ventas Acumuladas</th>
+                    <th class="p-2.5">% Comisión</th>
+                    <th class="p-2.5">Comisión ($)</th>
+                    <th class="p-2.5 text-center">Acciones</th>
+                  </tr>
+                </thead>
+                <tbody id="sellersTableBody" class="divide-y divide-slate-100"></tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-100">
+            <h3 class="text-sm font-bold text-slate-800 mb-3">Historial de Órdenes</h3>
+            <div class="overflow-x-auto">
+              <table class="w-full text-left text-xs">
+                <thead class="bg-slate-50 text-slate-500 font-semibold">
+                  <tr>
+                    <th class="p-2.5">Orden</th>
+                    <th class="p-2.5">Cliente</th>
+                    <th class="p-2.5">Entrega</th>
+                    <th class="p-2.5">Total</th>
+                    <th class="p-2.5">Ref. Pago</th>
+                    <th class="p-2.5">Estado</th>
+                    <th class="p-2.5 text-center">Acciones</th>
+                  </tr>
+                </thead>
+                <tbody id="ordersTableBody" class="divide-y divide-slate-100"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- MODALES -->
+  <div id="editProductModal" class="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 hidden flex justify-center items-center p-4">
+    <div class="bg-white w-full max-w-md rounded-2xl shadow-xl overflow-hidden">
+      <div class="p-4 bg-slate-900 text-white flex justify-between items-center">
+        <h3 class="text-sm font-bold">✏️ Editar Producto</h3>
+        <button onclick="closeEditProductModal()" class="text-slate-400 hover:text-white">✕</button>
+      </div>
+      <form id="editProductForm" onsubmit="saveEditedProduct(event)" class="p-4 space-y-3">
+        <input type="hidden" id="editPIdx">
+        <div>
+          <label class="block text-xs font-semibold text-slate-600 mb-1">Nombre</label>
+          <input type="text" id="editPName" required class="w-full border rounded-lg p-2 text-xs outline-none focus:ring-1 focus:ring-emerald-500">
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-slate-600 mb-1">Categoría</label>
+          <select id="editPCategory" class="w-full border rounded-lg p-2 text-xs outline-none">
+            <option>Preparadores y Bases</option>
+            <option>Esmaltes Semipermanentes</option>
+            <option>Sistemas Constructores</option>
+            <option>Herramientas y Lámparas</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-slate-600 mb-1">Sucursal</label>
+          <select id="editPBranch" class="w-full border rounded-lg p-2 text-xs outline-none font-medium">
+            <option value="San Félix">San Félix</option>
+            <option value="CC Alta Vista I">CC Alta Vista I</option>
+            <option value="CC Alta Vista II">CC Alta Vista II</option>
+          </select>
+        </div>
+        <div class="grid grid-cols-2 gap-2">
+          <div>
+            <label class="block text-xs font-semibold text-slate-600 mb-1">Precio ($)</label>
+            <input type="number" step="0.01" id="editPPrice" required class="w-full border rounded-lg p-2 text-xs outline-none">
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-600 mb-1">Stock Actual</label>
+            <input type="number" id="editPStock" required class="w-full border rounded-lg p-2 text-xs outline-none">
+          </div>
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-slate-600 mb-1">URL de Imagen</label>
+          <input type="url" id="editPImage" required class="w-full border rounded-lg p-2 text-xs outline-none">
+        </div>
+        <div class="flex justify-end gap-2 pt-2">
+          <button type="button" onclick="closeEditProductModal()" class="px-3 py-2 bg-gray-200 text-gray-700 font-bold rounded-xl text-xs">Cancelar</button>
+          <button type="submit" class="px-4 py-2 bg-emerald-600 text-white font-bold rounded-xl text-xs hover:bg-emerald-700">Guardar Cambios</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div id="editSellerModal" class="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 hidden flex justify-center items-center p-4">
+    <div class="bg-white w-full max-w-sm rounded-2xl shadow-xl overflow-hidden">
+      <div class="p-4 bg-slate-900 text-white flex justify-between items-center">
+        <h3 class="text-sm font-bold">✏️ Editar Vendedor</h3>
+        <button onclick="closeEditSellerModal()" class="text-slate-400 hover:text-white">✕</button>
+      </div>
+      <form id="editSellerForm" onsubmit="saveEditedSeller(event)" class="p-4 space-y-3">
+        <input type="hidden" id="editSIdx">
+        <div>
+          <label class="block text-xs font-semibold text-slate-600 mb-1">Nombre</label>
+          <input type="text" id="editSName" required class="w-full border rounded-lg p-2 text-xs outline-none focus:ring-1 focus:ring-emerald-500">
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-slate-600 mb-1">Sucursal Asignada</label>
+          <select id="editSBranch" class="w-full border rounded-lg p-2 text-xs outline-none font-medium">
+            <option value="San Félix">San Félix</option>
+            <option value="CC Alta Vista I">CC Alta Vista I</option>
+            <option value="CC Alta Vista II">CC Alta Vista II</option>
+          </select>
+        </div>
+        <div class="grid grid-cols-2 gap-2">
+          <div>
+            <label class="block text-xs font-semibold text-slate-600 mb-1">Ventas ($)</label>
+            <input type="number" step="0.01" id="editSSales" required class="w-full border rounded-lg p-2 text-xs outline-none">
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-600 mb-1">% Comisión</label>
+            <input type="number" step="0.1" id="editSCommRate" required class="w-full border rounded-lg p-2 text-xs outline-none">
+          </div>
+        </div>
+        <div class="flex justify-end gap-2 pt-2">
+          <button type="button" onclick="closeEditSellerModal()" class="px-3 py-2 bg-gray-200 text-gray-700 font-bold rounded-xl text-xs">Cancelar</button>
+          <button type="submit" class="px-4 py-2 bg-emerald-600 text-white font-bold rounded-xl text-xs hover:bg-emerald-700">Guardar Cambios</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div id="viewOrderModal" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 hidden flex justify-center items-center p-4">
+    <div class="bg-white w-full max-w-3xl max-h-[90vh] rounded-2xl shadow-xl flex flex-col overflow-hidden">
+      <div class="p-5 bg-slate-900 text-white flex justify-between items-center no-print">
+        <div>
+          <h2 class="text-base font-bold flex items-center gap-2">📄 Orden de Compra & Factura Digital</h2>
+          <p class="text-xs text-slate-400" id="orderModalSubtitle">Detalle de transacción</p>
+        </div>
+        <button onclick="closeOrderModal()" class="text-slate-400 hover:text-white text-xl">✕</button>
+      </div>
+
+      <div id="orderInvoicePrintArea" class="p-6 overflow-y-auto flex-1 bg-white">
+        <div class="flex justify-between items-start border-b pb-4 mb-4">
+          <div>
+            <div class="flex items-center gap-2 mb-1">
+              <span class="text-xl font-extrabold text-emerald-600">🥑 Avocado Shop C.A.</span>
+            </div>
+            <p class="text-xs text-slate-500 font-medium">RIF: J-501234567 • Insumos de Uñas, Cejas y Pestañas</p>
+            <p class="text-xs text-slate-500">Instagram: @avocadoshop</p>
+          </div>
+          <div class="text-right">
+            <span class="bg-emerald-100 text-emerald-800 text-xs font-black px-2.5 py-1 rounded-md inline-block mb-1">FACTURA DIGITAL</span>
+            <p class="text-sm font-black text-slate-900" id="modalOrderId">N° AVO-000000</p>
+            <p class="text-xs text-slate-500" id="modalOrderDate">Fecha: --/--/----</p>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-4 bg-slate-50 p-4 rounded-xl border border-slate-100 mb-6 text-xs">
+          <div>
+            <h4 class="font-bold text-slate-700 uppercase tracking-wider text-[10px] mb-1">Datos del Cliente</h4>
+            <p class="text-slate-900 font-bold" id="modalClientName">------</p>
+            <p class="text-slate-500" id="modalClientEmail">------</p>
+          </div>
+          <div>
+            <h4 class="font-bold text-slate-700 uppercase tracking-wider text-[10px] mb-1">Detalle de Entrega</h4>
+            <p class="text-slate-900 font-semibold" id="modalDeliveryType">------</p>
+            <p class="text-slate-500" id="modalBranch">------</p>
+          </div>
+        </div>
+
+        <div class="overflow-x-auto mb-6">
+          <table class="w-full text-left text-xs border-collapse">
+            <thead>
+              <tr class="bg-slate-900 text-white font-bold">
+                <th class="p-2.5 rounded-l-lg">SKU</th>
+                <th class="p-2.5">Producto</th>
+                <th class="p-2.5 text-center">Cant.</th>
+                <th class="p-2.5 text-right">P. Unit ($)</th>
+                <th class="p-2.5 text-right rounded-r-lg">Total ($)</th>
+              </tr>
+            </thead>
+            <tbody id="modalOrderItemsBody" class="divide-y divide-slate-100"></tbody>
+          </table>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2 border-t border-slate-100">
+          <div class="bg-emerald-50/80 p-3.5 rounded-xl border border-emerald-100 text-xs space-y-1">
+            <h4 class="font-bold text-emerald-900 text-[11px] mb-1">Información del Pago Móvil</h4>
+            <p class="text-slate-700"><strong>Referencia:</strong> <span id="modalPaymentRef" class="font-mono font-bold">------</span></p>
+            <p class="text-slate-700"><strong>Tasa BCV Aplicada:</strong> <span id="modalBcvRate">Bs. 0.00</span></p>
+            <p class="text-slate-700"><strong>Monto en Bs:</strong> <span id="modalTotalBs" class="font-bold text-emerald-800">Bs. 0.00</span></p>
+            <p class="text-slate-700"><strong>Estado:</strong> <span id="modalStatus" class="font-bold text-amber-700 bg-amber-100 px-1.5 py-0.5 rounded text-[10px]">Procesado</span></p>
+          </div>
+
+          <div class="flex flex-col justify-center items-end text-right space-y-1 bg-slate-50 p-3.5 rounded-xl border border-slate-100">
+            <span class="text-xs font-bold text-slate-500 uppercase tracking-wider">Monto Total a Entregar</span>
+            <span class="text-2xl font-black text-emerald-700" id="modalTotalUsd">$0.00</span>
+            <span class="text-xs font-bold text-slate-800" id="modalTotalBsSummary">Bs. 0.00</span>
+          </div>
+        </div>
+
+        <div class="mt-6 pt-4 border-t text-center text-[10px] text-slate-400">
+          <p>Gracias por tu compra en <strong>Avocado Shop C.A.</strong> • Comprobante válido para entrega del pedido.</p>
+        </div>
+      </div>
+
+      <div class="p-4 bg-slate-50 border-t flex flex-wrap justify-end gap-2 no-print">
+        <button onclick="closeOrderModal()" class="px-4 py-2 bg-slate-200 text-slate-700 font-bold rounded-xl text-xs hover:bg-slate-300 transition">Cerrar</button>
+        <button onclick="printOrderInvoice()" class="px-4 py-2 bg-slate-800 text-white font-bold rounded-xl text-xs hover:bg-black transition flex items-center gap-1.5">🖨️ Imprimir Factura</button>
+        <button id="btnDownloadInvoiceFromModal" class="px-4 py-2 bg-emerald-600 text-white font-bold rounded-xl text-xs hover:bg-emerald-700 transition flex items-center gap-1.5">💾 Guardar PDF Digital</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="screenReportModal" class="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 hidden flex justify-center items-center p-4">
+    <div class="bg-white w-full max-w-4xl max-h-[90vh] rounded-2xl shadow-xl flex flex-col overflow-hidden">
+      <div class="p-5 bg-slate-900 text-white flex justify-between items-center no-print">
+        <div>
+          <h2 class="text-lg font-bold">📋 Reporte General de Inventario</h2>
+          <p class="text-xs text-slate-400" id="reportBranchSubtitle">Vista detallada en pantalla</p>
+        </div>
+        <button onclick="closeScreenReport()" class="text-slate-400 hover:text-white text-xl">✕</button>
+      </div>
+
+      <div id="printableArea" class="p-6 overflow-y-auto flex-1">
+        <div class="flex justify-between items-center border-b pb-4 mb-4">
+          <div>
+            <h1 class="text-xl font-bold text-emerald-600">🥑 Avocado Shop C.A.</h1>
+            <p class="text-xs text-gray-500">Insumos de uñas, cejas y pestañas</p>
+          </div>
+          <div class="text-right text-xs text-gray-500">
+            <p><strong>Fecha:</strong> <span id="reportDate">--/--/----</span></p>
+            <p><strong>Tasa BCV:</strong> <span id="reportBcv">--</span></p>
+          </div>
+        </div>
+
+        <table class="w-full text-left text-xs mb-6">
+          <thead class="bg-slate-100 text-slate-700 font-bold border-b">
+            <tr>
+              <th class="p-2">SKU</th>
+              <th class="p-2">Producto</th>
+              <th class="p-2">Categoría</th>
+              <th class="p-2">Sucursal</th>
+              <th class="p-2 text-right">Precio ($)</th>
+              <th class="p-2 text-right">Precio (Bs)</th>
+              <th class="p-2 text-center">Stock</th>
+            </tr>
+          </thead>
+          <tbody id="screenReportBody" class="divide-y border-b"></tbody>
+        </table>
+
+        <div class="flex justify-between text-xs font-bold text-slate-700 bg-slate-50 p-3 rounded-xl">
+          <span id="reportTotalItems">Total Productos: 0</span>
+          <span id="reportTotalStock">Unidades Totales: 0</span>
+        </div>
+      </div>
+
+      <div class="p-4 bg-slate-50 border-t flex justify-end gap-3 no-print">
+        <button onclick="closeScreenReport()" class="px-4 py-2 bg-gray-200 text-gray-700 font-bold rounded-xl text-xs hover:bg-gray-300">Cerrar</button>
+        <button onclick="printInventoryReport()" class="px-4 py-2 bg-emerald-600 text-white font-bold rounded-xl text-xs hover:bg-emerald-700">Imprimir / PDF</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="cartModal" class="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 hidden flex justify-end">
+    <div class="w-full max-w-md bg-white h-full p-6 flex flex-col justify-between overflow-y-auto">
+      <div>
+        <div class="flex justify-between items-center mb-4">
+          <h2 class="text-lg font-bold">Tu Carrito</h2>
+          <button id="btnCloseCart" class="text-gray-400 hover:text-black">✕</button>
+        </div>
+
+        <div class="flex items-center justify-between bg-slate-50 border border-slate-200 p-2.5 rounded-xl mb-4 text-xs">
+          <span class="text-slate-600 font-semibold">🏛️ Tasa BCV aplicada:</span>
+          <span class="font-bold text-slate-900" id="cartBcvRate">Bs. 36.50 / USD</span>
+        </div>
+
+        <div id="cartItems" class="space-y-3"></div>
+      </div>
+
+      <div class="border-t pt-4">
+        <div class="space-y-2 mb-4">
+          <div>
+            <label class="block text-[11px] font-bold text-gray-700 mb-1">Nombre del Comprador:</label>
+            <input type="text" id="buyerName" placeholder="Tu Nombre y Apellido" class="w-full border rounded-lg p-2 text-xs focus:ring-emerald-500 outline-none">
+          </div>
+
+          <div>
+            <label class="block text-[11px] font-bold text-gray-700 mb-1">Opciones de Entrega:</label>
+            <select id="deliveryOption" onchange="toggleDeliveryAddress()" class="w-full border rounded-lg p-2 text-xs outline-none bg-white font-medium">
+              <option value="pickup">Retiro en Sucursal</option>
+              <option value="delivery">Envío por Delivery</option>
+            </select>
+          </div>
+
+          <div id="pickupBranchContainer">
+            <label class="block text-[11px] font-bold text-gray-700 mb-1">Sucursal para Retirar:</label>
+            <select id="cartBranchSelect" class="w-full border rounded-lg p-2 text-xs outline-none bg-white font-medium focus:ring-emerald-500">
+              <option value="San Félix">San Félix</option>
+              <option value="CC Alta Vista I">CC Alta Vista I</option>
+              <option value="CC Alta Vista II">CC Alta Vista II</option>
+            </select>
+          </div>
+
+          <div id="deliveryAddressContainer" class="hidden">
+            <label class="block text-[11px] font-bold text-gray-700 mb-1">Dirección Exacta de Envío:</label>
+            <textarea id="deliveryAddress" rows="2" placeholder="Ej: Urbanización, Calle, Casa/Apto, Punto de referencia" class="w-full border rounded-lg p-2 text-xs focus:ring-emerald-500 outline-none resize-none"></textarea>
+          </div>
+        </div>
+
+        <div class="space-y-1.5 mb-4">
+          <div class="flex justify-between font-bold text-base">
+            <span>Total USD:</span>
+            <span id="cartTotalUSD" class="text-emerald-700">$0.00</span>
+          </div>
+          <div class="flex justify-between font-extrabold text-sm text-slate-700">
+            <span>Total a Pagar (Bs.):</span>
+            <span id="cartTotalBS" class="text-emerald-900">Bs. 0.00</span>
+          </div>
+        </div>
+
+        <div class="bg-emerald-50 p-3.5 rounded-xl mb-4 border border-emerald-100 flex items-center justify-between gap-3">
+          <div>
+            <p class="text-[10px] font-bold text-emerald-800 uppercase tracking-wider mb-1">Datos Pago Móvil @avocadoshop</p>
+            <p class="text-xs text-gray-700"><strong>Banco:</strong> Banesco (0134)</p>
+            <p class="text-xs text-gray-700"><strong>CI/RIF:</strong> V-26.936.965</p>
+            <p class="text-xs text-gray-700"><strong>Teléfono:</strong> 0414-3943252</p>
+          </div>
+          <div class="flex-shrink-0 text-center">
+            <img src="qr_pago.jpeg" alt="QR Pago Móvil Banesco" class="w-20 h-20 object-contain rounded-lg border border-emerald-200 bg-white p-1 shadow-sm" onerror="this.src='https://via.placeholder.com/80?text=QR+Pago'">
+            <span class="text-[9px] font-bold text-emerald-700 block mt-0.5">Escanear QR</span>
+          </div>
+        </div>
+
+        <input type="text" id="pmReference" placeholder="Referencia Pago Móvil (6 dígitos)" class="w-full border rounded-lg p-2.5 mb-3 text-xs focus:ring-emerald-500 outline-none">
+        
+        <div class="flex gap-2">
+          <button type="button" onclick="cancelPurchase()" class="w-1/3 bg-red-50 text-red-600 font-bold py-3 rounded-xl hover:bg-red-100 transition text-xs border border-red-200">Cancelar</button>
+          <button id="btnCheckout" onclick="processCheckout()" class="w-2/3 bg-emerald-600 text-white font-bold py-3 rounded-xl hover:bg-emerald-700 transition text-xs">Confirmar Pedido vía WhatsApp</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Vinculación de Módulos JavaScript Externos -->
+  <script type="module" src="./supabaseClient.js"></script>
+  <script type="module" src="./main.js"></script>
+</body>
+</html>
