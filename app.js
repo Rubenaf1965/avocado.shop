@@ -924,6 +924,32 @@ window.updateBcvRatePrompt = () => {
   renderStoreProducts();
   updateCartUI();
 };
+async function fetchLiveBcvRate() {
+  const displayElement = document.getElementById('bcvRateDisplay');
+  
+  try {
+    const res = await fetch('https://ve.dolarapi.com/v1/dolares/oficial', { cache: 'no-store' });
+    const data = await res.json();
+    if (data && data.promedio) {
+      window.bcvRate = parseFloat(data.promedio);
+      if (displayElement) displayElement.textContent = `Bs. ${window.bcvRate.toFixed(2)}`;
+      return;
+    }
+  } catch (err) {
+    console.warn("Fallo API 1, intentando API 2...", err);
+  }
+
+  try {
+    const res = await fetch('https://pydolarvenezuela-api.vercel.app/api/v1/dollar?page=bcv');
+    const data = await res.json();
+    if (data && data.moneda) {
+      window.bcvRate = parseFloat(data.moneda);
+      if (displayElement) displayElement.textContent = `Bs. ${window.bcvRate.toFixed(2)}`;
+    }
+  } catch (err) {
+    if (displayElement) displayElement.textContent = "Bs. --";
+  }
+}
 
 function updateBcvUI() {
   const formattedRate = `Bs. ${window.bcvRate.toFixed(2)}`;
