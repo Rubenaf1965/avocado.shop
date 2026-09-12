@@ -12,6 +12,16 @@ let isAdminAuthenticated = false;
 let masterAdminLoggedIn = false;
 let activeModalOrder = null;
 
+// Función aux para convertir archivos de imagen a Base64
+function readFileAsBase64(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = (error) => reject(error);
+    reader.readAsDataURL(file);
+  });
+}
+
 async function fetchLiveBcvRate() {
   const primaryApi = 'https://ve.dolarapi.com/v1/dolares/oficial';
   const fallbackApi = 'https://pydolarvenezuela-api.vercel.app/api/v1/dollar?page=bcv';
@@ -427,7 +437,7 @@ window.openEditProductModal = (idx) => {
 
   document.getElementById('editPPrice').value = prod.price;
   document.getElementById('editPStock').value = prod.stock;
-  document.getElementById('editPImage').value = prod.image;
+  document.getElementById('editPImage').value = ''; 
   document.getElementById('editProductModal').classList.remove('hidden');
 };
 
@@ -435,7 +445,7 @@ window.closeEditProductModal = () => {
   document.getElementById('editProductModal').classList.add('hidden');
 };
 
-window.saveEditedProduct = (e) => {
+window.saveEditedProduct = async (e) => {
   e.preventDefault();
   const idx = document.getElementById('editPIdx').value;
   products[idx].name = document.getElementById('editPName').value;
@@ -447,7 +457,16 @@ window.saveEditedProduct = (e) => {
 
   products[idx].price = parseFloat(document.getElementById('editPPrice').value);
   products[idx].stock = parseInt(document.getElementById('editPStock').value);
-  products[idx].image = document.getElementById('editPImage').value;
+
+  const fileInput = document.getElementById('editPImage');
+  if (fileInput.files && fileInput.files[0]) {
+    try {
+      products[idx].image = await readFileAsBase64(fileInput.files[0]);
+    } catch (err) {
+      alert("Error al cargar la nueva imagen.");
+      return;
+    }
+  }
 
   saveState();
   renderStoreProducts();
@@ -797,31 +816,43 @@ window.filterAdminView = () => {
   }
 };
 
-window.handleCreateProduct = (e) => {
+window.handleCreateProduct = async (e) => {
   e.preventDefault();
   
   const pBranchSelect = document.getElementById('pBranch');
   const targetBranch = activeAdminBranch !== "ALL" ? activeAdminBranch : pBranchSelect.value;
+  const fileInput = document.getElementById('pImage');
+  
+  if (!fileInput.files || !fileInput.files[0]) {
+    alert("Por favor, selecciona una imagen PNG o JPG.");
+    return;
+  }
 
-  const newP = {
-    id: (products.length + 1).toString(),
-    sku: "PROD-00" + (products.length + 1),
-    name: document.getElementById('pName').value,
-    category: document.getElementById('pCategory').value,
-    branch: targetBranch,
-    price: parseFloat(document.getElementById('pPrice').value),
-    stock: parseInt(document.getElementById('pStock').value),
-    image: document.getElementById('pImage').value
-  };
-  
-  products.push(newP);
-  saveState();
-  renderStoreProducts();
-  filterAdminView();
-  document.getElementById('adminProductForm').reset();
-  
-  if (activeAdminBranch !== "ALL") {
-    pBranchSelect.value = activeAdminBranch;
+  try {
+    const base64Image = await readFileAsBase64(fileInput.files[0]);
+
+    const newP = {
+      id: (products.length + 1).toString(),
+      sku: "PROD-00" + (products.length + 1),
+      name: document.getElementById('pName').value,
+      category: document.getElementById('pCategory').value,
+      branch: targetBranch,
+      price: parseFloat(document.getElementById('pPrice').value),
+      stock: parseInt(document.getElementById('pStock').value),
+      image: base64Image
+    };
+    
+    products.push(newP);
+    saveState();
+    renderStoreProducts();
+    filterAdminView();
+    document.getElementById('adminProductForm').reset();
+    
+    if (activeAdminBranch !== "ALL") {
+      pBranchSelect.value = activeAdminBranch;
+    }
+  } catch (error) {
+    alert("Error procesando la imagen. Inténtalo de nuevo.");
   }
 };
 
