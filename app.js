@@ -12,7 +12,10 @@ let isAdminAuthenticated = false;
 let masterAdminLoggedIn = false;
 let activeModalOrder = null;
 
-// Función aux para convertir archivos de imagen a Base64
+// Array temporal para gestionar la carga secuencial desde la galería
+let sequentialBatch = [];
+
+// Helper para convertir archivos a Base64
 function readFileAsBase64(file) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -816,43 +819,112 @@ window.filterAdminView = () => {
   }
 };
 
+// OPCIÓN A: PROCESAR SELECCIÓN DESDE GALERÍA DE MANERA SECUENCIAL
+window.handleSequentialFilesSelect = async (event) => {
+  const files = Array.from(event.target.files);
+  if (!files.length) return;
+
+  const previewContainer = document.getElementById('sequentialPreviewContainer');
+  previewContainer.innerHTML = '';
+  sequentialBatch = [];
+
+  for (let i = 0; i < files.length; i++) {
+    const file = files[i];
+    try {
+      const base64Img = await readFileAsBase64(file);
+      sequentialBatch.push({
+        id: (products.length + i + 1).toString(),
+        sku: `PROD-00${products.length + i + 1}`,
+        image: base64Img,
+        fileName: file.name
+      });
+
+      // Insertar elemento en la UI del lote
+      const card = document.createElement('div');
+      card.className = "flex items-center gap-3 p-2 bg-slate-50 border rounded-xl text-xs";
+      card.innerHTML = `
+        <span class="font-bold text-slate-400">#${i + 1}</span>
+        <img src="${base64Img}" class="w-10 h-10 object-cover rounded-lg border">
+        <div class="flex-1 min-w-0">
+          <p class="font-semibold text-slate-700 truncate">${file.name}</p>
+          <span class="text-[10px] bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded font-mono">
+            SKU Asignado: PROD-00${products.length + i + 1}
+          </span>
+        </div>
+      `;
+      previewContainer.appendChild(card);
+    } catch (err) {
+      console.error("Error al leer archivo de galería:", err);
+    }
+  }
+};
+
+// OPCIÓN A: REGISTRO SECUENCIAL DE LOTES O PRODUCTO INDIVIDUAL
 window.handleCreateProduct = async (e) => {
   e.preventDefault();
-  
+
   const pBranchSelect = document.getElementById('pBranch');
   const targetBranch = activeAdminBranch !== "ALL" ? activeAdminBranch : pBranchSelect.value;
-  const fileInput = document.getElementById('pImage');
   
-  if (!fileInput.files || !fileInput.files[0]) {
-    alert("Por favor, selecciona una imagen PNG o JPG.");
-    return;
+  const name = document.getElementById('pName').value;
+  const category = document.getElementById('pCategory').value;
+  const price = parseFloat(document.getElementById('pPrice').value);
+  const stock = parseInt(document.getElementById('pStock').value);
+
+  // Si hay un lote cargado secuencialmente desde la galería
+  if (sequentialBatch.length > 0) {
+    sequentialBatch.forEach((item, idx) => {
+      products.push({
+        id: item.id,
+        sku: item.sku,
+        name: sequentialBatch.length > 1 ? `${name} (#${idx + 1})` : name,
+        category: category,
+        branch: targetBranch,
+        price: price,
+        stock: stock,
+        image: item.image
+      });
+    });
+
+    alert(`✅ Lote secuencial de ${sequentialBatch.length} producto(s) agregado(s) con éxito.`);
+    sequentialBatch = [];
+    document.getElementById('sequentialPreviewContainer').innerHTML = '';
+  } else {
+    // Registro individual convencional de la galería
+    const fileInput = document.getElementById('pImage');
+    if (!fileInput.files || !fileInput.files[0]) {
+      alert("Por favor, selecciona al menos una imagen desde tu galería.");
+      return;
+    }
+
+    try {
+      const base64Image = await readFileAsBase64(fileInput.files[0]);
+      const newP = {
+        id: (products.length + 1).toString(),
+        sku: "PROD-00" + (products.length + 1),
+        name: name,
+        category: category,
+        branch: targetBranch,
+        price: price,
+        stock: stock,
+        image: base64Image
+      };
+
+      products.push(newP);
+      alert("✅ Producto individual guardado con éxito.");
+    } catch (error) {
+      alert("Error procesando la imagen. Inténtalo de nuevo.");
+      return;
+    }
   }
 
-  try {
-    const base64Image = await readFileAsBase64(fileInput.files[0]);
+  saveState();
+  renderStoreProducts();
+  filterAdminView();
+  document.getElementById('adminProductForm').reset();
 
-    const newP = {
-      id: (products.length + 1).toString(),
-      sku: "PROD-00" + (products.length + 1),
-      name: document.getElementById('pName').value,
-      category: document.getElementById('pCategory').value,
-      branch: targetBranch,
-      price: parseFloat(document.getElementById('pPrice').value),
-      stock: parseInt(document.getElementById('pStock').value),
-      image: base64Image
-    };
-    
-    products.push(newP);
-    saveState();
-    renderStoreProducts();
-    filterAdminView();
-    document.getElementById('adminProductForm').reset();
-    
-    if (activeAdminBranch !== "ALL") {
-      pBranchSelect.value = activeAdminBranch;
-    }
-  } catch (error) {
-    alert("Error procesando la imagen. Inténtalo de nuevo.");
+  if (activeAdminBranch !== "ALL") {
+    pBranchSelect.value = activeAdminBranch;
   }
 };
 
