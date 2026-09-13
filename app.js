@@ -1038,3 +1038,40 @@ function updateBcvUI() {
   if (displayMobile) displayMobile.textContent = formattedRate;
   if (displayCart) displayCart.textContent = `${formattedRate} / USD`;
 }
+// Servicios del Centro de Manicura y Pedicura
+let manicureServices = [
+  { id: "srv-1", name: "Manicura Rusa + Gelificación", duration: "90 min", price: 25.00 },
+  { id: "srv-2", name: "Sistema de Uñas (Polygel / Acrílico)", duration: "120 min", price: 35.00 },
+  { id: "srv-3", name: "Pedicura Spa + Esmaltado Semipermanente", duration: "60 min", price: 20.00 },
+  { id: "srv-4", name: "Mantenimiento / Retiro de Sistema", duration: "45 min", price: 15.00 }
+];
+
+// Personal / Manicuristas por Sucursal
+let staffMembers = [
+  { id: "stf-1", name: "Valeria Gómez", branch: "San Félix", specialty: "Nail Art & Polygel" },
+  { id: "stf-2", name: "Camila Rivas", branch: "CC Alta Vista I", specialty: "Manicura Rusa" },
+  { id: "stf-3", name: "Daniela Torres", branch: "CC Alta Vista II", specialty: "Pedicura Spa & Gel" }
+];
+
+// Citas iniciales de prueba
+let appointments = JSON.parse(localStorage.getItem('avocado_appointments')) || [
+  {
+    appointmentId: "AVO-CIT-101",
+    clientName: "Laura Mendoza",
+    clientPhone: "584141234567",
+    serviceId: "srv-1",
+    serviceName: "Manicura Rusa + Gelificación",
+    price: 25.00,
+    branch: "San Félix",
+    staffId: "stf-1",
+    staffName: "Valeria Gómez",
+    date: "2026-09-15",
+    time: "10:00 AM",
+    status: "Confirmada",
+    createdAt: new Date().toISOString()
+  }
+];
+
+function saveAppointmentsState() {
+  localStorage.setItem('avocado_appointments', JSON.stringify(appointments));
+}

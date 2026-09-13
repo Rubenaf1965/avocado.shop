@@ -252,7 +252,34 @@
             <button type="submit" class="w-full bg-emerald-600 text-white font-bold py-2.5 rounded-xl hover:bg-emerald-700 transition text-xs">Guardar Nuevo Producto</button>
           </form>
         </div>
+	<!-- MÓDULO ADMINISTRATIVO DE AGENDA -->
+<div class="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm mt-6">
+  <div class="flex items-center justify-between mb-4">
+    <div>
+      <h3 class="font-bold text-slate-800 text-base">🗓️ Agenda del Centro de Manicura</h3>
+      <p class="text-xs text-slate-400">Control de citas, estado del servicio y envío de recordatorios automáticos.</p>
+    </div>
+  </div>
 
+  <div class="overflow-x-auto">
+    <table class="w-full text-left border-collapse">
+      <thead>
+        <tr class="bg-slate-50 text-[11px] font-bold text-slate-600 border-b">
+          <th class="p-2.5">Código</th>
+          <th class="p-2.5">Cliente</th>
+          <th class="p-2.5">Servicio</th>
+          <th class="p-2.5">Sucursal / Especialista</th>
+          <th class="p-2.5">Fecha y Hora</th>
+          <th class="p-2.5">Estado</th>
+          <th class="p-2.5 text-center">Acciones</th>
+        </tr>
+      </thead>
+      <tbody id="appointmentsTableBody">
+        <!-- Render dinámico desde JavaScript -->
+      </tbody>
+    </table>
+  </div>
+</div>
         <div class="lg:col-span-2 space-y-6">
           <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-100">
             <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-4">
@@ -642,7 +669,77 @@
       </div>
     </div>
   </div>
+<!-- SECCIÓN DE RESERVAS ONLINE CLIENTE -->
+<section class="max-w-4xl mx-auto my-8 p-6 bg-white rounded-2xl border border-slate-100 shadow-sm">
+  <div class="text-center mb-6">
+    <span class="bg-emerald-100 text-emerald-800 text-xs font-bold px-3 py-1 rounded-full uppercase tracking-wider">Avocado Spa & Nails</span>
+    <h2 class="text-2xl font-extrabold text-slate-800 mt-2">Reserva tu Cita de Manicura</h2>
+    <p class="text-xs text-slate-500">Elige tu servicio favorito, especialista y horario en pocos pasos.</p>
+  </div>
 
+  <form id="appointmentForm" onsubmit="handleCreateAppointment(event)" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+    <div>
+      <label class="block text-xs font-semibold text-slate-600 mb-1">Nombre Completo *</label>
+      <input type="text" id="appClientName" required placeholder="Ej. María Delgado" class="w-full text-xs border rounded-lg p-2.5 outline-none focus:ring-2 focus:ring-emerald-500">
+    </div>
+
+    <div>
+      <label class="block text-xs font-semibold text-slate-600 mb-1">WhatsApp de Contacto *</label>
+      <input type="tel" id="appClientPhone" required placeholder="Ej. 584143943252" class="w-full text-xs border rounded-lg p-2.5 outline-none focus:ring-2 focus:ring-emerald-500">
+    </div>
+
+    <div>
+      <label class="block text-xs font-semibold text-slate-600 mb-1">Sucursal *</label>
+      <select id="appBranchSelect" class="w-full text-xs border rounded-lg p-2.5 outline-none focus:ring-2 focus:ring-emerald-500">
+        <option value="San Félix">San Félix</option>
+        <option value="CC Alta Vista I">CC Alta Vista I</option>
+        <option value="CC Alta Vista II">CC Alta Vista II</option>
+      </select>
+    </div>
+
+    <div>
+      <label class="block text-xs font-semibold text-slate-600 mb-1">Servicio *</label>
+      <select id="appServiceSelect" class="w-full text-xs border rounded-lg p-2.5 outline-none focus:ring-2 focus:ring-emerald-500">
+        <option value="srv-1">Manicura Rusa + Gelificación ($25.00)</option>
+        <option value="srv-2">Sistema de Uñas Polygel ($35.00)</option>
+        <option value="srv-3">Pedicura Spa + Semipermanente ($20.00)</option>
+        <option value="srv-4">Mantenimiento / Retiro ($15.00)</option>
+      </select>
+    </div>
+
+    <div>
+      <label class="block text-xs font-semibold text-slate-600 mb-1">Manicurista Preferida</label>
+      <select id="appStaffSelect" class="w-full text-xs border rounded-lg p-2.5 outline-none focus:ring-2 focus:ring-emerald-500">
+        <option value="stf-1">Valeria Gómez (Nail Art & Polygel)</option>
+        <option value="stf-2">Camila Rivas (Manicura Rusa)</option>
+        <option value="stf-3">Daniela Torres (Pedicura Spa & Gel)</option>
+      </select>
+    </div>
+
+    <div class="grid grid-cols-2 gap-2">
+      <div>
+        <label class="block text-xs font-semibold text-slate-600 mb-1">Fecha *</label>
+        <input type="date" id="appDate" required class="w-full text-xs border rounded-lg p-2.5 outline-none focus:ring-2 focus:ring-emerald-500">
+      </div>
+      <div>
+        <label class="block text-xs font-semibold text-slate-600 mb-1">Hora *</label>
+        <select id="appTimeSelect" class="w-full text-xs border rounded-lg p-2.5 outline-none focus:ring-2 focus:ring-emerald-500">
+          <option value="09:00 AM">09:00 AM</option>
+          <option value="10:30 AM">10:30 AM</option>
+          <option value="01:00 PM">01:00 PM</option>
+          <option value="02:30 PM">02:30 PM</option>
+          <option value="04:00 PM">04:00 PM</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="md:col-span-2 mt-2">
+      <button type="submit" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 rounded-xl transition text-xs shadow-md">
+        📅 Agendar y Enviar Cita por WhatsApp
+      </button>
+    </div>
+  </form>
+</section>
   <!-- Vinculación de Módulos JavaScript Externos -->
   <script type="module" src="./app.js"></script>
   <script type="module" src="./supabaseClient.js"></script>
