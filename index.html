@@ -96,7 +96,8 @@
         </div>
       </div>
 
-     <div id="productGrid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4"></div>
+      <!-- Rejilla optimizada con hasta 6 columnas para evitar tarjetas gigantes y mantener uniformidad móvil -->
+      <div id="productGrid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4"></div>
 
       <!-- SECCIÓN DE RESERVAS ONLINE CLIENTE -->
       <section class="max-w-4xl mx-auto my-12 p-6 bg-white rounded-2xl border border-slate-100 shadow-sm">
@@ -748,9 +749,9 @@
     </div>
   </div>
 
-  <!-- Vinculación de Módulos JavaScript Externos -->
-  <script type="module" src="./app.js"></script>
-  <script type="module" src="./supabaseClient.js"></script>
-  <script type="module" src="./main.js"></script>
+  <!-- Vinculación de Módulos JavaScript Externos con parámetro de versión para evitar caché móvil -->
+  <script type="module" src="./supabaseClient.js?v=20260914"></script>
+  <script type="module" src="./app.js?v=20260914"></script>
+  <script type="module" src="./main.js?v=20260914"></script>
 </body>
 </html>
