@@ -860,6 +860,54 @@ window.handleSequentialFilesSelect = async (event) => {
 };
 
 // OPCIÓN A: REGISTRO SECUENCIAL DE LOTES O PRODUCTO INDIVIDUAL
+window.handleCreateProduct = async (event) => {
+  event.preventDefault();
+
+  const name = document.getElementById('newProductName').value.trim();
+  const sku = document.getElementById('newProductSku').value.trim();
+  const category = document.getElementById('newProductCategory').value;
+  const branch = masterAdminLoggedIn ? document.getElementById('newProductBranch').value : activeAdminBranch;
+  const price = parseFloat(document.getElementById('newProductPrice').value);
+  const stock = parseInt(document.getElementById('newProductStock').value);
+  
+  const fileInput = document.getElementById('newProductImage');
+  let imageUrl = "https://images.unsplash.com/photo-1604654894610-df63bc536371?w=400"; // Imagen por defecto
+
+  if (fileInput && fileInput.files && fileInput.files[0]) {
+    try {
+      imageUrl = await readFileAsBase64(fileInput.files[0]);
+    } catch (err) {
+      console.error("Error al procesar la imagen", err);
+    }
+  }
+
+  const newProduct = {
+    id: 'prod-' + Date.now(),
+    sku: sku || ('PROD-' + Math.floor(100 + Math.random() * 900)),
+    name,
+    category,
+    branch,
+    price,
+    stock,
+    image: imageUrl
+  };
+
+  // Añadir al array global
+  products.push(newProduct);
+
+  // Guardar estado en localStorage
+  saveState();
+
+  // Actualizar la interfaz de inmediato
+  renderStoreProducts();
+  filterAdminView();
+  updateBranchStats();
+
+  // Limpiar formulario y cerrar modal si aplica
+  event.target.reset();
+  alert(`¡Producto "${name}" agregado con éxito!`);
+};
+
 window.handleCreateProduct = async (e) => {
   e.preventDefault();
 
