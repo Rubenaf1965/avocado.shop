@@ -96,6 +96,7 @@
         </div>
       </div>
 
+      <!-- Rejilla optimizada con hasta 6 columnas para evitar tarjetas gigantes y mantener uniformidad móvil -->
       <div id="productGrid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4"></div>
 
       <!-- SECCIÓN DE RESERVAS ONLINE CLIENTE -->
@@ -204,7 +205,7 @@
       <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
         <div>
           <h1 class="text-2xl font-bold text-slate-900">🥑 Dashboard Administrativo</h1>
-          <p class="text-xs text-slate-500" id="adminHeaderSub">Control Multi-Sucursal de Inventario, Vendedores y Facturación en Tiempo Real</p>
+          <p class="text-xs text-slate-500" id="adminHeaderSub">Control Multi-Sucursal de Inventario, Vendedores y Facturación</p>
         </div>
 
         <div class="flex flex-wrap items-center gap-2">
@@ -294,7 +295,7 @@
                 <p class="text-[10px] text-slate-400 mt-1">Puedes seleccionar una o más imágenes ordenadas secuencialmente desde tu galería.</p>
               </div>
 
-              <!-- Contenedor dinámico de previsualización -->
+              <!-- Contenedor dinámico de previsualización de la carga en lote -->
               <div id="sequentialPreviewContainer" class="space-y-2 my-2 max-h-40 overflow-y-auto"></div>
               
               <div>
@@ -324,7 +325,7 @@
                   <input type="number" id="pStock" required class="w-full border rounded-lg p-2 text-xs outline-none">
                 </div>
               </div>
-              <button type="submit" class="w-full bg-emerald-600 text-white font-bold py-2.5 rounded-xl hover:bg-emerald-700 transition text-xs">Guardar en Base de Datos</button>
+              <button type="submit" class="w-full bg-emerald-600 text-white font-bold py-2.5 rounded-xl hover:bg-emerald-700 transition text-xs">Guardar Nuevo Producto</button>
             </form>
           </div>
         </div>
@@ -353,7 +354,7 @@
                   </tr>
                 </thead>
                 <tbody id="appointmentsTableBody">
-                  <!-- Render dinámico desde Supabase -->
+                  <!-- Render dinámico desde JavaScript -->
                 </tbody>
               </table>
             </div>
@@ -362,8 +363,8 @@
           <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-100">
             <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-4">
               <div>
-                <h3 class="text-sm font-bold text-slate-800">📋 Inventario de Productos Sincronizado</h3>
-                <p class="text-[11px] text-slate-400">Gestiona existencias en tiempo real desde celular o web</p>
+                <h3 class="text-sm font-bold text-slate-800">📋 Inventario de Productos</h3>
+                <p class="text-[11px] text-slate-400">Gestiona las existencias, edita, elimina ítems o genera reportes</p>
               </div>
               
               <div class="flex items-center gap-2">
@@ -748,9 +749,9 @@
     </div>
   </div>
 
-  <!-- Vinculación de Módulos JavaScript Externos sincronizados -->
-  <script type="module" src="./supabaseClient.js?v=20260915"></script>
-  <script type="module" src="./app.js?v=20260915"></script>
-  <script type="module" src="./main.js?v=20260915"></script>
+  <!-- Vinculación de Módulos JavaScript Externos con parámetro de versión para evitar caché móvil -->
+  <script type="module" src="./supabaseClient.js?v=20260914"></script>
+  <script type="module" src="./app.js?v=20260914"></script>
+  <script type="module" src="./main.js?v=20260914"></script>
 </body>
 </html>
