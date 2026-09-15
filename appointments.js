@@ -140,3 +140,26 @@ window.deleteAppointment = (idx) => {
     renderAppointmentsTable();
   }
 };
+// guardar cita
+const guardarCita = async (datosCita) => {
+  const { error } = await supabase
+    .from('appointments')
+    -insert([
+      {
+        codigo: datosCita.codigo, // Ej: CITA-001
+        cliente: datosCita.cliente,
+        telefono: datosCita.telefono,
+        servicio: datosCita.servicio,
+        sucursal_especialista: datosCita.sucursalEspecialista,
+        fecha_hora: datosCita.fechaHora,
+        estado: 'Pendiente',
+        recordatorio_enviado: false
+      }
+    ]);
+
+  if (error) {
+    console.error('Error al guardar la cita:', error.message);
+    return false;
+  }
+  return true;
+};
