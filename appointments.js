@@ -125,20 +125,16 @@ window.handleCreateAppointment = async (e) => {
   alert(`✅ Tu solicitud de cita #${appointmentId} ha sido enviada con éxito.`);
 };
 
-// --- CARGAR CITAS DESDE SUPABASE AL PANEL (CON REINTENTO) ---
-async function loadAppointmentsFromSupabase(retries = 5) {
-  // Busca cualquier variante global del cliente de Supabase
+// --- CARGAR CITAS DESDE SUPABASE AL PANEL CON DETECCIÓN SEGURA ---
+async function loadAppointmentsFromSupabase() {
+  // Buscamos de forma exhaustiva la instancia activa de Supabase
   const client = window.supabaseClient || 
-                 (typeof supabase !== 'undefined' && typeof supabase.from === 'function' ? supabase : null) ||
-                 window._supabase;
+                 window.supabase || 
+                 (typeof supabase !== 'undefined' && typeof supabase.from === 'function' ? supabase : null);
   
-  if (!client) {
-    if (retries > 0) {
-      // Si aún no carga, espera 300ms y vuelve a intentar
-      setTimeout(() => loadAppointmentsFromSupabase(retries - 1), 300);
-    } else {
-      console.warn('Cliente de Supabase no disponible tras varios intentos.');
-    }
+  if (!client || typeof client.from !== 'function') {
+    // Si aún no está listo, volvemos a intentar en un momento sin saturar
+    setTimeout(loadAppointmentsFromSupabase, 500);
     return;
   }
   
@@ -171,7 +167,12 @@ async function loadAppointmentsFromSupabase(retries = 5) {
   }
 }
 
-// --- EJECUTAR AL CARGAR LA VENTANA ---
+// --- EJECUTAR AL CARGAR LA VENTANA O ESCUCHAR EL CLIENTE ---
 window.addEventListener('DOMContentLoaded', () => {
+  loadAppointmentsFromSupabase();
+});
+
+// Por si el script de Supabase carga de último, aseguramos un disparador adicional
+window.addEventListener('load', () => {
   loadAppointmentsFromSupabase();
 });
