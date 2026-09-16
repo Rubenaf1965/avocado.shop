@@ -1,4 +1,8 @@
-
+// Agrega esta constante al inicio de appointments.js
+const staffMembers = [
+    { id: 'staff-1', name: 'Especialista San Félix', branch: 'san felix' },
+    { id: 'staff-2', name: 'Especialista Alta Vista', branch: 'cc alta vista i' }
+];
 const manicureServices = [
     { id: 'manicure', name: 'Manicure', duration: '2 horas' },
     { id: 'pedicure', name: 'Pedicure', duration: '1 hora 40 minutos' }
