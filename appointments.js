@@ -1,3 +1,4 @@
+
 // Agrega esta constante al inicio de appointments.js
 const staffMembers = [
     { id: 'staff-1', name: 'Especialista San Félix', branch: 'san felix' },
