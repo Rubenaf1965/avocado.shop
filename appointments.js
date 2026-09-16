@@ -194,17 +194,60 @@ function renderAppointmentsTableSafe() {
     return;
   }
 
-  // Si hay una función original definida por el usuario, la usamos; si no, pintamos por defecto
-  if (typeof renderAppointmentsTable === 'function' && renderAppointmentsTable !== renderAppointmentsTableSafe) {
-    try {
-      renderAppointmentsTable();
-      return;
-    } catch (e) {
-      console.log('Usando renderizado seguro alternativo...');
-    }
+  // --- CARGAR Y RENDERIZAR CITAS DESDE SUPABASE (Adaptado a columnas en inglés) ---
+async function loadAppointmentsFromSupabase() {
+  const client = window.supabaseClient || 
+                 window.supabase || 
+                 (typeof supabase !== 'undefined' && typeof supabase.from === 'function' ? supabase : null);
+  
+  if (!client || typeof client.from !== 'function') {
+    setTimeout(loadAppointmentsFromSupabase, 500);
+    return;
+  }
+  
+  const { data, error } = await client
+    .from('appointments')
+    .select('*');
+
+  if (error) {
+    console.error('Error al cargar citas de Supabase:', error.message);
+    return;
   }
 
-  // Pintar filas en la tabla
+  console.log('Datos recibidos de Supabase (appointments):', data);
+
+  if (data && data.length > 0) {
+    window.appointments = data.map(item => ({
+      // Mapeo adaptado a las columnas en inglés de tu base de datos y respaldos en español
+      appointmentId: item.code || item.codigo || item.id || 'N/A',
+      clientName: item.client_name || item.cliente || item.nombre || 'Sin nombre',
+      clientPhone: item.client_phone || item.telefono || item.phone || '',
+      serviceName: item.service_name || item.servicio || 'Servicio General',
+      staffName: item.staff || item.sucursal_especialista || 'Asignación Automática',
+      dateTime: item.date || item.fecha_hora || 'Por definir',
+      status: item.status || item.estado || 'Pendiente'
+    }));
+
+    renderAppointmentsTableSafe();
+  } else {
+    console.warn('La tabla appointments está vacía.');
+    window.appointments = [];
+    renderAppointmentsTableSafe();
+  }
+}
+
+// Función para pintar la tabla de forma segura en la Agenda
+function renderAppointmentsTableSafe() {
+  const agendaHeader = Array.from(document.querySelectorAll('h3, h4, div')).find(el => el.textContent.includes('Agenda del Centro de Manicura'));
+  const parentCard = agendaHeader ? agendaHeader.closest('div') : null;
+  const targetTable = parentCard ? parentCard.querySelector('table') : document.querySelector('table');
+  const tbody = targetTable ? targetTable.querySelector('tbody') : null;
+
+  if (!tbody) {
+    console.warn('No se encontró el <tbody> de la tabla de la agenda.');
+    return;
+  }
+
   if (!window.appointments || window.appointments.length === 0) {
     tbody.innerHTML = `<tr><td colspan="6" style="text-align: center; padding: 15px; color: #64748b;">No hay citas registradas en la base de datos.</td></tr>`;
     return;
@@ -216,15 +259,16 @@ function renderAppointmentsTableSafe() {
       <td style="padding: 10px 16px; font-size: 13px;"><strong>${app.clientName}</strong><br><span style="font-size: 11px; color: #64748b;">${app.clientPhone}</span></td>
       <td style="padding: 10px 16px; font-size: 13px;">${app.serviceName}</td>
       <td style="padding: 10px 16px; font-size: 13px;">${app.staffName}</td>
-      <td style="padding: 10px 16px; font-size: 13px;">${app.date} - ${app.time}</td>
-      <td style="padding: 10px 16px; font-size: 13px;"><span style="background: #eefbf4; color: #00a66c; padding: 4px 8px; border-radius: 4px; font-weight: bold;">${app.status}</span></td>
+      <td style="padding: 10px 16px; font-size: 13px;">${app.dateTime}</td>
+      <td style="padding: 10px 16px; font-size: 13px;">
+        <span style="background: #eefbf4; color: #00a66c; padding: 4px 8px; border-radius: 4px; font-weight: bold; display: inline-block;">
+          ${app.status}
+        </span>
+      </td>
     </tr>
   `).join('');
 }
 
-window.addEventListener('DOMContentLoaded', () => {
-  loadAppointmentsFromSupabase();
-});
-window.addEventListener('load', () => {
-  loadAppointmentsFromSupabase();
-});
+// Inicializar al cargar la página
+window.addEventListener('DOMContentLoaded', loadAppointmentsFromSupabase);
+window.addEventListener('load', loadAppointmentsFromSupabase);
