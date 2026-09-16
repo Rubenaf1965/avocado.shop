@@ -13,13 +13,14 @@ const manicureServices = [
 window.appointments = window.appointments || [];
 
 // Función auxiliar segura para obtener el cliente de Supabase
+
 function getSupabaseClient() {
-    const s = window.supabaseClient || window.supabase || window._supabase;
+    // Apuntamos directamente a window.supabase que es el objeto válido detectado
+    const s = window.supabase;
     if (!s) return null;
     const client = s.default && typeof s.default.from === 'function' ? s.default : s;
     return (client && typeof client.from === 'function') ? client : null;
 }
-
 // --- PROCESAR LA RESERVA DESDE EL FORMULARIO WEB ---
 window.handleCreateAppointment = async (e) => {
     e.preventDefault();
