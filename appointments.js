@@ -13,6 +13,18 @@ const manicureServices = [
 // Arreglo global de citas
 window.appointments = window.appointments || [];
 
+// Función auxiliar segura para obtener el cliente de Supabase
+function getSupabaseClient() {
+    if (window.supabaseClient && typeof window.supabaseClient.from === 'function') {
+        return window.supabaseClient;
+    }
+    // Si window.supabase es una instancia directa con .from
+    if (window.supabase && typeof window.supabase.from === 'function') {
+        return window.supabase;
+    }
+    return null;
+}
+
 // --- PROCESAR LA RESERVA DESDE EL FORMULARIO WEB ---
 window.handleCreateAppointment = async (e) => {
     e.preventDefault();
@@ -38,7 +50,7 @@ window.handleCreateAppointment = async (e) => {
         service = {
             id: serviceId,
             name: selectedText.split('(')[0].trim() || serviceId,
-            price: 25.00 // Respaldo por defecto
+            price: 25.00
         };
     }
 
@@ -46,48 +58,30 @@ window.handleCreateAppointment = async (e) => {
     const appointmentId = 'AVO-CIT-' + Math.floor(1000 + Math.random() * 9000);
     const currentBcv = window.bcvRate || 36.50;
     const totalBs = (service.price * currentBcv).toFixed(2);
+    const staffNameFinal = staff ? staff.name : 'Asignación Automática';
 
-    const newAppointment = {
-        appointmentId,
-        clientName,
-        clientPhone,
-        serviceId: service.id,
-        serviceName: service.name,
-        price: service.price,
-        branch,
-        staffId,
-        staffName: staff ? staff.name : 'Asignación Automática',
-        date,
-        time,
-        status: 'Pendiente',
-        createdAt: new Date().toISOString()
-    };
-
-    // Guardar en Supabase si está disponible la función o el cliente
-    const client = window.supabaseClient || window.supabase || (typeof supabase !== 'undefined' && typeof supabase.from === 'function' ? supabase : null);
-    
-    if (typeof guardarCita === 'function') {
-        await guardarCita({
-            codigo: appointmentId,
-            cliente: clientName,
-            telefono: clientPhone,
-            servicio: service.name,
-            sucursalEspecialista: `${branch} (${newAppointment.staffName})`,
-            fechaHora: `${date} - ${time}`
-        });
-    } else if (client) {
-        await client.from('appointments').insert([{
-            codigo: appointmentId,
-            cliente: clientName,
-            telefono: clientPhone,
-            servicio: service.name,
-            sucursal_especialista: `${branch} (${newAppointment.staffName})`,
-            fecha_hora: `${date} - ${time}`,
-            estado: 'Pendiente'
-        }]);
+    // Intentar guardar en Supabase de forma segura sin bloquear el flujo si falla
+    try {
+        const client = getSupabaseClient();
+        if (client) {
+            const { error: dbError } = await client.from('appointments').insert([{
+                codigo: appointmentId,
+                cliente: clientName,
+                telefono: clientPhone,
+                servicio: service.name,
+                sucursal_especialista: `${branch} (${staffNameFinal})`,
+                fecha_hora: `${date} - ${time}`,
+                estado: 'Pendiente'
+            }]);
+            if (dbError) {
+                console.error('Aviso de Supabase al insertar:', dbError.message);
+            }
+        }
+    } catch (err) {
+        console.error('Excepción al conectar con Supabase:', err);
     }
 
-    // Recargar las citas desde Supabase para actualizar la tabla inmediatamente
+    // Actualizar la tabla localmente de inmediato
     await loadAppointmentsFromSupabase();
 
     // Crear mensaje directo para el WhatsApp de Avocado Shop
@@ -96,7 +90,7 @@ window.handleCreateAppointment = async (e) => {
     msg += `👤 *Cliente:* ${clientName}\n`;
     msg += `💅 *Servicio:* ${service.name}\n`;
     msg += `🏢 *Sucursal:* ${branch}\n`;
-    msg += `👩‍🎨 *Especialista:* ${newAppointment.staffName}\n`;
+    msg += `👩‍🎨 *Especialista:* ${staffNameFinal}\n`;
     msg += `📅 *Fecha:* ${date}\n`;
     msg += `⏰ *Hora:* ${time}\n`;
     msg += `💰 *Total:* $${service.price.toFixed(2)} (Bs. ${totalBs})\n\n`;
@@ -105,19 +99,17 @@ window.handleCreateAppointment = async (e) => {
     const encodedMsg = encodeURIComponent(msg);
     window.open(`https://wa.me/584143943252?text=${encodedMsg}`, '_blank');
 
-    // Resetear formulario y avisar
-    const formEl = document.getElementById('appointmentForm');
+    // Resetear formulario y avisar con éxito
+    const formEl = document.getElementById('appointmentForm') || document.querySelector('form');
     if (formEl) formEl.reset();
     alert(`✅ Tu solicitud de cita #${appointmentId} ha sido enviada con éxito.`);
 };
 
 // --- CARGAR Y RENDERIZAR CITAS DESDE SUPABASE ---
 async function loadAppointmentsFromSupabase() {
-    const client = window.supabaseClient || 
-                   window.supabase || 
-                   (typeof supabase !== 'undefined' && typeof supabase.from === 'function' ? supabase : null);
+    const client = getSupabaseClient();
     
-    if (!client || typeof client.from !== 'function') {
+    if (!client) {
         setTimeout(loadAppointmentsFromSupabase, 500);
         return;
     }
@@ -130,8 +122,6 @@ async function loadAppointmentsFromSupabase() {
         console.error('Error al cargar citas de Supabase:', error.message);
         return;
     }
-
-    console.log('Datos recibidos de Supabase (appointments):', data);
 
     if (data && data.length > 0) {
         window.appointments = data.map(item => ({
@@ -146,7 +136,6 @@ async function loadAppointmentsFromSupabase() {
 
         renderAppointmentsTableSafe();
     } else {
-        console.warn('La tabla appointments está vacía.');
         window.appointments = [];
         renderAppointmentsTableSafe();
     }
@@ -159,10 +148,7 @@ function renderAppointmentsTableSafe() {
     const targetTable = parentCard ? parentCard.querySelector('table') : document.querySelector('table');
     const tbody = targetTable ? targetTable.querySelector('tbody') : null;
 
-    if (!tbody) {
-        console.warn('No se encontró el <tbody> de la tabla de la agenda.');
-        return;
-    }
+    if (!tbody) return;
 
     if (!window.appointments || window.appointments.length === 0) {
         tbody.innerHTML = `<tr><td colspan="6" style="text-align: center; padding: 15px; color: #64748b;">No hay citas registradas en la base de datos.</td></tr>`;
