@@ -36,7 +36,7 @@ function getSupabaseClient() {
     return null;
 }
 
-// --- PROCESAR LA RESERVA DESDE EL FORMULARIO WEB ---
+// --- CREAR CITA Y ENVIAR A WHATSAPP ---
 window.handleCreateAppointment = async (e) => {
     if (e && e.preventDefault) e.preventDefault();
 
@@ -110,7 +110,7 @@ window.handleCreateAppointment = async (e) => {
     alert(`✅ Tu solicitud de cita #${appointmentId} ha sido enviada con éxito.`);
 };
 
-// --- CARGAR Y RENDERIZAR CITAS DESDE SUPABASE ---
+// --- CARGAR CITAS DESDE SUPABASE ---
 async function loadAppointmentsFromSupabase() {
     const client = getSupabaseClient();
     
@@ -147,7 +147,7 @@ async function loadAppointmentsFromSupabase() {
     renderAppointmentsScreen();
 }
 
-// CAMBIAR ESTADO DE CITA
+// ESTADOS Y ELIMINACIÓN DE CITAS
 window.updateAppointmentStatus = async (appointmentId, newStatus) => {
     const client = getSupabaseClient();
     const app = window.appointments.find(a => a.appointmentId === appointmentId || a.id == appointmentId);
@@ -162,7 +162,6 @@ window.updateAppointmentStatus = async (appointmentId, newStatus) => {
             .eq(queryField, queryValue);
 
         if (error) {
-            console.error('Error al actualizar estado:', error.message);
             alert('No se pudo actualizar el estado en la base de datos.');
             return;
         }
@@ -170,7 +169,6 @@ window.updateAppointmentStatus = async (appointmentId, newStatus) => {
     await loadAppointmentsFromSupabase();
 };
 
-// ELIMINAR CITA
 window.deleteAppointment = async (appointmentId) => {
     if (!confirm(`¿Estás seguro de eliminar la cita #${appointmentId}?`)) return;
 
@@ -187,7 +185,6 @@ window.deleteAppointment = async (appointmentId) => {
             .eq(queryField, queryValue);
 
         if (error) {
-            console.error('Error al eliminar cita:', error.message);
             alert('No se pudo eliminar la cita de la base de datos.');
             return;
         }
@@ -195,7 +192,7 @@ window.deleteAppointment = async (appointmentId) => {
     await loadAppointmentsFromSupabase();
 };
 
-// RENDERIZAR TABLA ADMIN PRINCIPAL / VISTA PREVIA
+// VISTAS DE TABLA ADMIN
 function renderAppointmentsTableSafe() {
     const tbody = document.getElementById('appointmentsTableBody');
     if (!tbody) return;
@@ -231,7 +228,7 @@ function renderAppointmentsTableSafe() {
     `).join('');
 }
 
-// --- PANTALLA COMPLETA DE CITAS ---
+// MODAL PANTALLA COMPLETA
 window.displayAppointmentsScreen = () => {
     const modal = document.getElementById('appointmentsScreenModal');
     if (modal) {
@@ -286,21 +283,6 @@ window.renderAppointmentsScreen = () => {
     `).join('');
 };
 
-// ENLAZAR EVENT LISTENER AL FORMULARIO
-function attachFormListener() {
-    const form = document.getElementById('appointmentForm') || document.getElementById('appForm') || document.querySelector('form');
-    if (form) {
-        form.removeEventListener('submit', window.handleCreateAppointment);
-        form.addEventListener('submit', window.handleCreateAppointment);
-    }
-}
-
 // INICIALIZACIÓN
-window.addEventListener('DOMContentLoaded', () => {
-    loadAppointmentsFromSupabase();
-    attachFormListener();
-});
-window.addEventListener('load', () => {
-    loadAppointmentsFromSupabase();
-    attachFormListener();
-});
+window.addEventListener('DOMContentLoaded', loadAppointmentsFromSupabase);
+window.addEventListener('load', loadAppointmentsFromSupabase);

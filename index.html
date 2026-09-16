@@ -3,111 +3,63 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Avocado Shop - Insumos de uñas, cejas y pestañas</title>
-    <!-- Tailwind CSS CDN -->
+    <title>Avocado Shop Pro - Insumos Profesionales</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Supabase CDN -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body class="bg-slate-50 text-slate-800 font-sans antialiased pb-20">
 
-    <!-- HEADER / NAVBAR PRINCIPAL -->
+    <!-- BARRA NAVEGACIÓN PRINCIPAL -->
     <header class="bg-white border-b sticky top-0 z-40 shadow-sm">
-        <div class="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between gap-2 md:gap-4">
-            
-            <!-- LOGO & BRANDING -->
+        <div class="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between gap-4">
             <div class="flex items-center gap-2 cursor-pointer" onclick="showSection('shop')">
                 <div class="flex flex-col">
-                    <span class="font-extrabold text-xl md:text-2xl text-emerald-700 tracking-tight leading-none">
-                        Avocado Shop 🥑
-                    </span>
-                    <span class="text-[10px] text-slate-500 font-semibold mt-0.5">
-                        Insumos de uñas, cejas y pestañas 🥑
-                    </span>
+                    <span class="font-extrabold text-xl text-emerald-700 tracking-tight leading-none">Avocado Shop 🥑</span>
+                    <span class="text-[10px] text-slate-500 font-semibold mt-0.5">Insumos de uñas, cejas y pestañas</span>
                 </div>
             </div>
 
-            <!-- BUSCADOR CENTRAL -->
             <div class="hidden md:flex flex-1 max-w-md mx-4">
                 <input type="text" id="searchInput" oninput="filterProducts()" placeholder="Buscar geles, lámparas, brochas..." 
                     class="w-full text-xs bg-slate-100 border border-transparent focus:border-emerald-500 focus:bg-white rounded-full px-4 py-2 outline-none transition">
             </div>
 
-            <!-- NAVEGACIÓN Y ACCIONES -->
-            <div class="flex items-center gap-2 md:gap-4">
-                <!-- BADGE TASA BCV -->
+            <div class="flex items-center gap-3">
                 <div class="bg-slate-800 text-emerald-400 text-[11px] font-bold px-3 py-1.5 rounded-full flex items-center gap-1 shadow-inner">
                     <span>BCV:</span>
                     <span id="bcvRateBadge">Bs. 832.49</span>
                 </div>
 
-                <button onclick="showSection('shop')" class="text-xs font-bold text-slate-700 hover:text-emerald-600 px-2 py-1">
-                    Tienda
-                </button>
-                <button onclick="showSection('tracking')" class="text-xs font-bold text-slate-700 hover:text-emerald-600 px-2 py-1">
-                    Rastreo
-                </button>
-                <button onclick="openAdminModal()" class="text-xs font-bold bg-emerald-50 text-emerald-700 hover:bg-emerald-100 px-3 py-1.5 rounded-lg border border-emerald-200 transition">
-                    Panel Admin
-                </button>
-
-                <!-- BOTÓN CARRITO -->
+                <button onclick="showSection('shop')" class="text-xs font-bold text-slate-700 hover:text-emerald-600 px-2 py-1">Tienda</button>
+                <button onclick="showSection('tracking')" class="text-xs font-bold text-slate-700 hover:text-emerald-600 px-2 py-1">Rastreo</button>
+                <button onclick="displayAppointmentsScreen()" class="text-xs font-bold bg-indigo-50 text-indigo-700 hover:bg-indigo-100 px-3 py-1.5 rounded-lg border border-indigo-200 transition">🖥️ Citas</button>
                 <button onclick="toggleCartDrawer()" class="relative bg-slate-100 hover:bg-slate-200 p-2 rounded-full transition">
-                    🛒
-                    <span id="cartCount" class="absolute -top-1 -right-1 bg-emerald-600 text-white text-[10px] font-bold w-5 h-5 rounded-full flex items-center justify-center">
-                        0
-                    </span>
+                    🛒 <span id="cartCount" class="absolute -top-1 -right-1 bg-emerald-600 text-white text-[10px] font-bold w-5 h-5 rounded-full flex items-center justify-center">0</span>
                 </button>
             </div>
-        </div>
-
-        <!-- BUSCADOR EN MÓVIL -->
-        <div class="px-4 pb-3 md:hidden">
-            <input type="text" id="searchInputMobile" oninput="filterProducts()" placeholder="Buscar geles, lámparas, brochas..." 
-                class="w-full text-xs bg-slate-100 border border-transparent focus:border-emerald-500 focus:bg-white rounded-full px-4 py-2 outline-none">
         </div>
     </header>
 
-    <!-- BARRA BANDERÍN TASA OFICIAL BCV -->
+    <!-- BANNER TASA BCV -->
     <div class="bg-emerald-50 border-b border-emerald-100 py-2 px-4">
         <div class="max-w-7xl mx-auto flex items-center justify-between text-xs font-bold text-emerald-900">
-            <div class="flex items-center gap-2">
-                <span>🏛️ Tasa Oficial BCV: <strong id="bcvRateBanner">Bs. 832.49</strong></span>
-            </div>
-            <button onclick="openBcvModal()" class="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1 rounded-md text-[11px] transition">
-                Modificar
-            </button>
+            <span>🏛️ Tasa Oficial BCV: <strong id="bcvRateBanner">Bs. 832.49</strong></span>
+            <button onclick="openBcvModal()" class="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1 rounded-md text-[11px] transition">Modificar</button>
         </div>
     </div>
 
     <!-- SECCIÓN TIENDA / CATÁLOGO -->
     <section id="shopSection" class="max-w-7xl mx-auto px-4 py-6">
-        
-        <!-- BOTONES CATEGORÍAS -->
         <div class="flex items-center gap-2 overflow-x-auto pb-3 mb-4 scrollbar-none">
-            <button onclick="filterCategory('ALL')" class="category-btn active bg-emerald-600 text-white text-xs font-bold px-4 py-2 rounded-full whitespace-nowrap transition">
-                Todos
-            </button>
-            <button onclick="filterCategory('Preparadores y Bases')" class="category-btn bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 text-xs font-bold px-4 py-2 rounded-full whitespace-nowrap transition">
-                Preparadores y Bases
-            </button>
-            <button onclick="filterCategory('Esmaltes Semi')" class="category-btn bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 text-xs font-bold px-4 py-2 rounded-full whitespace-nowrap transition">
-                Esmaltes Semi
-            </button>
-            <button onclick="filterCategory('Sistemas Constructores')" class="category-btn bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 text-xs font-bold px-4 py-2 rounded-full whitespace-nowrap transition">
-                Sistemas Constructores
-            </button>
-            <button onclick="filterCategory('Herramientas y Lámparas')" class="category-btn bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 text-xs font-bold px-4 py-2 rounded-full whitespace-nowrap transition">
-                Herramientas y Lámparas
-            </button>
+            <button onclick="filterCategory('ALL')" class="category-btn active bg-emerald-600 text-white text-xs font-bold px-4 py-2 rounded-full whitespace-nowrap">Todos</button>
+            <button onclick="filterCategory('Preparadores y Bases')" class="category-btn bg-white border border-slate-200 text-slate-700 text-xs font-bold px-4 py-2 rounded-full whitespace-nowrap">Preparadores y Bases</button>
+            <button onclick="filterCategory('Esmaltes Semi')" class="category-btn bg-white border border-slate-200 text-slate-700 text-xs font-bold px-4 py-2 rounded-full whitespace-nowrap">Esmaltes Semi</button>
+            <button onclick="filterCategory('Sistemas Constructores')" class="category-btn bg-white border border-slate-200 text-slate-700 text-xs font-bold px-4 py-2 rounded-full whitespace-nowrap">Sistemas Constructores</button>
         </div>
 
-        <!-- SELECTOR FILTRO SUCURSAL -->
         <div class="bg-emerald-50/60 border border-emerald-100 p-3 rounded-xl mb-6 flex items-center justify-between max-w-sm">
-            <label class="text-xs font-bold text-emerald-900 flex items-center gap-1">
-                📍 Sucursal:
-            </label>
-            <select id="branchFilterSelect" onchange="filterProducts()" class="bg-white border border-slate-200 text-slate-800 font-bold text-xs rounded-lg px-3 py-1.5 outline-none cursor-pointer">
+            <label class="text-xs font-bold text-emerald-900">📍 Sucursal:</label>
+            <select id="branchFilterSelect" onchange="filterProducts()" class="bg-white border text-slate-800 font-bold text-xs rounded-lg px-3 py-1.5 outline-none cursor-pointer">
                 <option value="ALL">Todas las Sucursales</option>
                 <option value="San Félix">San Félix</option>
                 <option value="CC Alta Vista I">CC Alta Vista I</option>
@@ -115,83 +67,43 @@
             </select>
         </div>
 
-        <!-- GRID TARJETAS DE PRODUCTOS -->
-        <div id="productsGrid" class="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-6">
-            <!-- Ejemplo de Renderizado Dinámico vía JavaScript -->
-            <div class="bg-white rounded-2xl border border-slate-100 p-3 shadow-sm hover:shadow-md transition flex flex-col justify-between">
-                <div class="relative mb-3">
-                    <span class="absolute top-2 right-2 bg-emerald-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-full z-10">Stock: 25</span>
-                    <img src="https://via.placeholder.com/200" alt="Producto" class="w-full h-40 object-cover rounded-xl bg-slate-100">
-                </div>
-                <div>
-                    <div class="flex items-center gap-1 mb-1">
-                        <span class="text-[10px] font-bold bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded-md">Preparadores y Bases</span>
-                        <span class="text-[10px] font-bold bg-slate-100 text-slate-600 px-2 py-0.5 rounded-md">San Félix</span>
-                    </div>
-                    <h3 class="text-xs font-bold text-slate-800 line-clamp-2">Rubber Base Avocado Gel 15ml</h3>
-                </div>
-                <div class="mt-3 pt-2 border-t flex items-center justify-between">
-                    <div>
-                        <span class="text-sm font-extrabold text-slate-900">$12.00</span>
-                        <p class="text-[10px] text-slate-400 font-semibold">Bs. 9989.86</p>
-                    </div>
-                    <button class="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs px-3 py-1.5 rounded-lg transition">
-                        + Agregar
-                    </button>
-                </div>
-            </div>
+        <div id="productsGrid" class="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+            <!-- Productos cargados dinámicamente -->
         </div>
     </section>
 
-    <!-- SECCIÓN RASTREO DE PEDIDO -->
-    <section id="trackingSection" class="max-w-2xl mx-auto px-4 py-12 hidden">
-        <div class="bg-white rounded-2xl shadow-sm border p-6 text-center">
-            <h2 class="text-xl font-extrabold text-slate-900 mb-2">📦 Rastrear mi Pedido</h2>
-            <p class="text-xs text-slate-500 mb-6">Ingresa el código de tu pedido para verificar su estado de despacho.</p>
-            
-            <div class="flex gap-2 max-w-md mx-auto mb-6">
-                <input type="text" id="trackingInput" placeholder="Ej. AVO-849201" class="flex-1 text-xs border rounded-xl p-3 outline-none focus:border-emerald-500 uppercase font-mono">
-                <button onclick="searchTrackingCode()" class="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs px-5 py-3 rounded-xl transition">
-                    Buscar
-                </button>
-            </div>
-            <div id="trackingResult" class="text-xs text-slate-600"></div>
-        </div>
-    </section>
-
-    <!-- FORMULARIO DE RESERVA DE CITAS (AVOCADO SPA) -->
+    <!-- MÓDULO FORMULARIO DE CITAS -->
     <section id="appointmentSection" class="max-w-4xl mx-auto px-4 py-8">
         <div class="bg-white rounded-2xl shadow-sm border p-6 md:p-8">
             <div class="text-center mb-6">
                 <span class="text-[11px] font-bold tracking-widest text-emerald-600 uppercase bg-emerald-50 px-3 py-1 rounded-full">AVOCADO SPA & NAILS</span>
-                <h2 class="text-2xl font-extrabold text-slate-900 mt-2">Reserva tu Cita de Manicura</h2>
-                <p class="text-xs text-slate-500 mt-1">Elige tu servicio favorito, especialista y horario en pocos pasos.</p>
+                <h2 class="text-2xl font-extrabold text-slate-800 mt-2">Reserva tu Cita de Manicura</h2>
             </div>
 
             <form id="appointmentForm" onsubmit="handleCreateAppointment(event)" class="space-y-4">
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
-                        <label class="block text-xs font-bold text-slate-700 mb-1">Nombre Completo *</label>
-                        <input type="text" id="appClientName" required placeholder="Ej. María Delgado" class="w-full text-xs p-3 border rounded-xl outline-none focus:border-emerald-500 bg-slate-50">
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">Nombre Completo *</label>
+                        <input type="text" id="appClientName" required placeholder="Ej. María Delgado" class="w-full text-xs border rounded-lg p-2.5 outline-none focus:ring-2 focus:ring-emerald-500">
                     </div>
                     <div>
-                        <label class="block text-xs font-bold text-slate-700 mb-1">WhatsApp de Contacto *</label>
-                        <input type="tel" id="appClientPhone" required placeholder="Ej. 584143943252" class="w-full text-xs p-3 border rounded-xl outline-none focus:border-emerald-500 bg-slate-50">
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">Teléfono *</label>
+                        <input type="tel" id="appClientPhone" required placeholder="04141234567" class="w-full text-xs border rounded-lg p-2.5 outline-none focus:ring-2 focus:ring-emerald-500">
                     </div>
                 </div>
 
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
-                        <label class="block text-xs font-bold text-slate-700 mb-1">Sucursal *</label>
-                        <select id="appBranchSelect" class="w-full text-xs p-3 border rounded-xl outline-none focus:border-emerald-500 bg-slate-50 font-medium">
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">Sucursal *</label>
+                        <select id="appBranchSelect" class="w-full text-xs border rounded-lg p-2.5 outline-none focus:ring-2 focus:ring-emerald-500">
                             <option value="San Félix">San Félix</option>
                             <option value="CC Alta Vista I">CC Alta Vista I</option>
                             <option value="CC Alta Vista II">CC Alta Vista II</option>
                         </select>
                     </div>
                     <div>
-                        <label class="block text-xs font-bold text-slate-700 mb-1">Servicio *</label>
-                        <select id="appServiceSelect" class="w-full text-xs p-3 border rounded-xl outline-none focus:border-emerald-500 bg-slate-50 font-medium">
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">Servicio *</label>
+                        <select id="appServiceSelect" class="w-full text-xs border rounded-lg p-2.5 outline-none focus:ring-2 focus:ring-emerald-500">
                             <option value="srv-1">Manicura Rusa + Gelificación ($25.00)</option>
                             <option value="srv-2">Sistema de Uñas Polygel ($35.00)</option>
                             <option value="srv-3">Pedicura Spa + Semipermanente ($20.00)</option>
@@ -202,20 +114,20 @@
 
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div>
-                        <label class="block text-xs font-bold text-slate-700 mb-1">Manicurista Preferida</label>
-                        <select id="appStaffSelect" class="w-full text-xs p-3 border rounded-xl outline-none focus:border-emerald-500 bg-slate-50 font-medium">
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">Especialista</label>
+                        <select id="appStaffSelect" class="w-full text-xs border rounded-lg p-2.5 outline-none focus:ring-2 focus:ring-emerald-500">
                             <option value="stf-1">Valeria Gómez (Nail Art & Polygel)</option>
                             <option value="stf-2">Camila Rivas (Manicura Rusa)</option>
                             <option value="stf-3">Daniela Torres (Pedicura Spa & Gel)</option>
                         </select>
                     </div>
                     <div>
-                        <label class="block text-xs font-bold text-slate-700 mb-1">Fecha *</label>
-                        <input type="date" id="appDate" required class="w-full text-xs p-3 border rounded-xl outline-none focus:border-emerald-500 bg-slate-50">
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">Fecha *</label>
+                        <input type="date" id="appDate" required class="w-full text-xs border rounded-lg p-2.5 outline-none focus:ring-2 focus:ring-emerald-500">
                     </div>
                     <div>
-                        <label class="block text-xs font-bold text-slate-700 mb-1">Hora *</label>
-                        <select id="appTimeSelect" class="w-full text-xs p-3 border rounded-xl outline-none focus:border-emerald-500 bg-slate-50 font-medium">
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">Hora *</label>
+                        <select id="appTimeSelect" class="w-full text-xs border rounded-lg p-2.5 outline-none focus:ring-2 focus:ring-emerald-500">
                             <option value="09:00 AM">09:00 AM</option>
                             <option value="11:00 AM">11:00 AM</option>
                             <option value="02:00 PM">02:00 PM</option>
@@ -224,56 +136,80 @@
                     </div>
                 </div>
 
-                <button type="submit" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3.5 px-4 rounded-xl shadow-md transition text-xs md:text-sm flex items-center justify-center gap-2">
-                    🗓️ Agendar y Enviar Cita por WhatsApp
+                <button type="submit" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 rounded-xl transition text-xs shadow-md">
+                    🗓️ Reservar Cita vía WhatsApp
                 </button>
             </form>
         </div>
     </section>
 
-    <!-- DRAWER LATERAL: CARRITO DE COMPRAS -->
-    <div id="cartDrawer" class="fixed inset-0 z-50 overflow-hidden hidden">
-        <div class="absolute inset-0 bg-slate-900/50 backdrop-blur-sm" onclick="toggleCartDrawer()"></div>
-        <div class="absolute inset-y-0 right-0 max-w-full flex pl-10">
-            <div class="w-screen max-w-md bg-white shadow-2xl flex flex-col">
-                <div class="p-4 border-b flex items-center justify-between bg-slate-50">
-                    <h3 class="font-extrabold text-slate-800 text-sm">🛒 Tu Carrito</h3>
-                    <button onclick="toggleCartDrawer()" class="text-slate-400 hover:text-slate-700 text-lg font-bold">✕</button>
+    <!-- DRAWER LATERAL: CARRITO DE COMPRAS Y CHECKOUT -->
+    <div id="cartDrawer" class="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 hidden flex justify-end">
+        <div class="bg-white w-full max-w-md h-full shadow-2xl flex flex-col justify-between p-6 overflow-y-auto">
+            <div>
+                <div class="flex items-center justify-between pb-4 border-b">
+                    <h2 class="text-lg font-bold text-slate-800">🛒 Tu Carrito de Compras</h2>
+                    <button onclick="toggleCartDrawer()" class="text-slate-400 hover:text-slate-600 font-bold text-xl">✕</button>
                 </div>
-                <div id="cartItemsList" class="flex-1 p-4 overflow-y-auto space-y-3">
-                    <!-- Productos en Carrito -->
-                </div>
-                <div class="p-4 border-t bg-slate-50 space-y-2">
-                    <div class="flex justify-between text-xs font-bold text-slate-600">
-                        <span>Total USD:</span>
-                        <span id="cartTotalUsd" class="text-slate-900 font-extrabold">$0.00</span>
+                <div id="cartItems" class="space-y-3 my-4"></div>
+            </div>
+
+            <div class="border-t pt-4">
+                <form id="checkoutForm" onsubmit="handleCheckout(event)" class="space-y-3">
+                    <div>
+                        <label class="block text-[11px] font-bold text-slate-600 mb-1">Nombre Completo *</label>
+                        <input type="text" id="cName" required class="w-full border rounded-lg p-2 text-xs outline-none">
                     </div>
-                    <div class="flex justify-between text-xs font-bold text-emerald-700">
-                        <span>Total Estimado (Bs):</span>
-                        <span id="cartTotalBs" class="font-extrabold">Bs. 0.00</span>
+                    <div class="grid grid-cols-2 gap-2">
+                        <div>
+                            <label class="block text-[11px] font-bold text-slate-600 mb-1">C.I / RIF *</label>
+                            <input type="text" id="cDoc" required placeholder="V-12345678" class="w-full border rounded-lg p-2 text-xs outline-none">
+                        </div>
+                        <div>
+                            <label class="block text-[11px] font-bold text-slate-600 mb-1">Teléfono *</label>
+                            <input type="tel" id="cPhone" required placeholder="04141234567" class="w-full border rounded-lg p-2 text-xs outline-none">
+                        </div>
                     </div>
-                    <button onclick="processCheckoutWhatsApp()" class="w-full mt-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 rounded-xl text-xs transition">
-                        Finalizar Pedido por WhatsApp
+                    <div>
+                        <label class="block text-[11px] font-bold text-slate-600 mb-1">Método de Entrega *</label>
+                        <select id="cDelivery" onchange="toggleDeliveryFields()" class="w-full border rounded-lg p-2 text-xs outline-none font-medium">
+                            <option value="pickup">Retiro en Tienda (Gratis)</option>
+                            <option value="delivery">Delivery ($3.00 Adicional)</option>
+                        </select>
+                    </div>
+                    <div id="branchSelectContainer">
+                        <label class="block text-[11px] font-bold text-slate-600 mb-1">Seleccionar Sucursal *</label>
+                        <select id="cBranch" class="w-full border rounded-lg p-2 text-xs outline-none font-medium">
+                            <option value="San Félix">San Félix</option>
+                            <option value="CC Alta Vista I">CC Alta Vista I</option>
+                            <option value="CC Alta Vista II">CC Alta Vista II</option>
+                        </select>
+                    </div>
+                    <div id="addressContainer" class="hidden">
+                        <label class="block text-[11px] font-bold text-slate-600 mb-1">Dirección de Envío Exacta *</label>
+                        <textarea id="cAddress" rows="2" class="w-full border rounded-lg p-2 text-xs outline-none" placeholder="Indica sector, calle, punto de referencia..."></textarea>
+                    </div>
+                    <div>
+                        <label class="block text-[11px] font-bold text-slate-600 mb-1">Número de Referencia (Pago Móvil) *</label>
+                        <input type="text" id="cRef" required placeholder="Ej: 984012" class="w-full border rounded-lg p-2 text-xs outline-none">
+                    </div>
+                    <button type="submit" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 rounded-xl transition text-xs shadow-md">
+                        🚀 Confirmar Pedido y Enviar WhatsApp
                     </button>
-                </div>
+                </form>
             </div>
         </div>
     </div>
 
-    <!-- MODAL CITAS ADMINISTRADOR COMPLETO -->
+    <!-- MODAL CITAS PANTALLA COMPLETA -->
     <div id="appointmentsScreenModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
         <div class="bg-white w-full max-w-5xl rounded-2xl shadow-2xl border flex flex-col max-h-[90vh]">
             <div class="p-4 border-b flex items-center justify-between bg-slate-50 rounded-t-2xl">
-                <div>
-                    <h3 class="font-extrabold text-slate-900 text-base">🗓️ Gestión General de Citas</h3>
-                    <p class="text-xs text-slate-500">Busca, filtra y actualiza el estado de las solicitudes.</p>
-                </div>
+                <h3 class="font-extrabold text-slate-900 text-base">🖥️ Pantalla General de Citas</h3>
                 <button onclick="closeAppointmentsScreen()" class="text-slate-400 hover:text-slate-700 text-xl font-bold p-1">✕</button>
             </div>
-
             <div class="p-4 border-b bg-white flex flex-wrap gap-3 items-center justify-between">
                 <input type="text" id="appScreenSearch" oninput="renderAppointmentsScreen()" placeholder="🔍 Buscar por cliente o código..." class="text-xs p-2.5 border rounded-lg w-full md:w-64 outline-none">
-                
                 <select id="appScreenBranchFilter" onchange="renderAppointmentsScreen()" class="text-xs p-2.5 border rounded-lg bg-slate-50 font-bold outline-none">
                     <option value="ALL">Todas las sucursales</option>
                     <option value="San Félix">San Félix</option>
@@ -281,7 +217,6 @@
                     <option value="CC Alta Vista II">CC Alta Vista II</option>
                 </select>
             </div>
-
             <div class="p-4 overflow-y-auto flex-1">
                 <table class="w-full text-left border-collapse">
                     <thead>
@@ -295,59 +230,24 @@
                             <th class="p-3 text-center">Acción</th>
                         </tr>
                     </thead>
-                    <tbody id="appointmentsScreenTableBody">
-                        <!-- Renderizado dinámico pantalla amplia -->
-                    </tbody>
+                    <tbody id="appointmentsScreenTableBody"></tbody>
                 </table>
             </div>
         </div>
     </div>
 
-    <!-- MODAL CAMBIAR TASA BCV -->
-    <div id="bcvModal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
-        <div class="bg-white rounded-2xl max-w-xs w-full p-6 shadow-xl text-center">
-            <h3 class="font-extrabold text-slate-900 text-sm mb-3">Actualizar Tasa BCV</h3>
-            <input type="number" step="0.01" id="newBcvInput" placeholder="Ej. 832.49" class="w-full text-xs p-3 border rounded-xl outline-none mb-4 text-center font-bold">
-            <div class="flex gap-2">
-                <button onclick="closeBcvModal()" class="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold py-2 rounded-lg">Cancelar</button>
-                <button onclick="saveNewBcvRate()" class="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold py-2 rounded-lg">Guardar</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- CARGA DE SCRIPTS -->
     <script src="appointments.js"></script>
     <script>
-        // Lógica de pestañas de navegación
-        function showSection(section) {
-            document.getElementById('shopSection').classList.toggle('hidden', section !== 'shop');
-            document.getElementById('trackingSection').classList.toggle('hidden', section !== 'tracking');
-        }
-
         function toggleCartDrawer() {
             document.getElementById('cartDrawer').classList.toggle('hidden');
         }
-
-        function openBcvModal() {
-            document.getElementById('bcvModal').classList.remove('hidden');
+        function toggleDeliveryFields() {
+            const isDelivery = document.getElementById('cDelivery').value === 'delivery';
+            document.getElementById('addressContainer').classList.toggle('hidden', !isDelivery);
+            document.getElementById('branchSelectContainer').classList.toggle('hidden', isDelivery);
         }
-
-        function closeBcvModal() {
-            document.getElementById('bcvModal').classList.add('hidden');
-        }
-
-        function saveNewBcvRate() {
-            const val = parseFloat(document.getElementById('newBcvInput').value);
-            if (val > 0) {
-                window.bcvRate = val;
-                document.getElementById('bcvRateBadge').innerText = `Bs. ${val.toFixed(2)}`;
-                document.getElementById('bcvRateBanner').innerText = `Bs. ${val.toFixed(2)}`;
-                closeBcvModal();
-            }
-        }
-
-        function openAdminModal() {
-            displayAppointmentsScreen();
+        function showSection(sec) {
+            document.getElementById('shopSection').classList.toggle('hidden', sec !== 'shop');
         }
     </script>
 </body>
