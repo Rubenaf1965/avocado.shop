@@ -214,3 +214,18 @@ function renderAppointmentsTableSafe() {
 // Inicializar al cargar la página
 window.addEventListener('DOMContentLoaded', loadAppointmentsFromSupabase);
 window.addEventListener('load', loadAppointmentsFromSupabase);
+// Exponer funciones de modal y reporte al scope global
+window.displayAppointmentsScreen = function() {
+  const modal = document.getElementById('screenAppointmentsModal');
+  if (modal) modal.classList.remove('hidden');
+  if (typeof renderScreenAppointments === 'function') renderScreenAppointments();
+};
+
+window.closeAppointmentsScreen = function() {
+  const modal = document.getElementById('screenAppointmentsModal');
+  if (modal) modal.classList.add('hidden');
+};
+
+window.printAppointmentsReport = function() {
+  window.print();
+};
