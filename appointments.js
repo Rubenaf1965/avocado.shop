@@ -1,12 +1,13 @@
-
-// Agrega esta constante al inicio de appointments.js
+// Agrega esta constante al inicio de appointments.js con sus precios correspondientes
 const staffMembers = [
     { id: 'staff-1', name: 'Especialista San Félix', branch: 'san felix' },
     { id: 'staff-2', name: 'Especialista Alta Vista', branch: 'cc alta vista i' }
 ];
+
 const manicureServices = [
-    { id: 'manicure', name: 'Manicure', duration: '2 horas' },
-    { id: 'pedicure', name: 'Pedicure', duration: '1 hora 40 minutos' }
+    { id: 'manicure', name: 'Manicure', price: 20.00, duration: '2 horas' },
+    { id: 'pedicure', name: 'Pedicure', price: 18.00, duration: '1 hora 40 minutos' },
+    { id: 'Manicura Rusa + Gelificación', name: 'Manicura Rusa + Gelificación', price: 25.00, duration: '2 horas' }
 ];
 // Procesar la reserva desde el formulario web
 window.handleCreateAppointment = (e) => {
@@ -154,9 +155,9 @@ window.deleteAppointment = (idx) => {
 const guardarCita = async (datosCita) => {
   const { error } = await supabase
     .from('appointments')
-    -insert([
+    .insert([  // <--- Corregido de -insert a .insert
       {
-        codigo: datosCita.codigo, // Ej: CITA-001
+        codigo: datosCita.codigo,
         cliente: datosCita.cliente,
         telefono: datosCita.telefono,
         servicio: datosCita.servicio,
