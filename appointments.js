@@ -1,77 +1,50 @@
 // --- CONSTANTES Y CONFIGURACIÓN DE CITAS ---
 const staffMembers = [
-    { id: 'stf-1', name: 'Valeria Gómez (Nail Art & Polygel)', branch: 'San Félix' },
-    { id: 'stf-2', name: 'Camila Rivas (Manicura Rusa)', branch: 'CC Alta Vista I' },
-    { id: 'stf-3', name: 'Daniela Torres (Pedicura Spa & Gel)', branch: 'CC Alta Vista II' }
+    { id: 'staff-1', name: 'Especialista San Félix', branch: 'san felix' },
+    { id: 'staff-2', name: 'Especialista Alta Vista', branch: 'cc alta vista i' }
 ];
-
 const manicureServices = [
-    { id: 'srv-1', name: 'Manicura Rusa + Gelificación', price: 25.00, duration: '2 horas' },
-    { id: 'srv-2', name: 'Sistema de Uñas Polygel', price: 35.00, duration: '2 horas' },
-    { id: 'srv-3', name: 'Pedicura Spa + Semipermanente', price: 20.00, duration: '1 hora 40 minutos' },
-    { id: 'srv-4', name: 'Mantenimiento / Retiro', price: 15.00, duration: '1 hora' }
+    { id: 'manicure', name: 'Manicure', price: 20.00, duration: '2 horas' },
+    { id: 'pedicure', name: 'Pedicure', price: 18.00, duration: '1 hora 40 minutos' },
+    { id: 'Manicura Rusa + Gelificación', name: 'Manicura Rusa + Gelificación', price: 25.00, duration: '2 horas' }
 ];
-
 window.appointments = window.appointments || [];
-let cachedSupabaseClient = null;
-
-// OBTENER CLIENTE SUPABASE DE FORMA SEGURA
+// Función auxiliar segura para obtener el cliente de Supabase
 function getSupabaseClient() {
-    if (cachedSupabaseClient) return cachedSupabaseClient;
-
-    const s = window.supabase;
+    const s = window.supabaseClient || window.supabase || window._supabase;
     if (!s) return null;
-
-    if (typeof s.createClient === 'function' && window.SUPABASE_URL && window.SUPABASE_ANON_KEY) {
-        cachedSupabaseClient = s.createClient(window.SUPABASE_URL, window.SUPABASE_ANON_KEY);
-        return cachedSupabaseClient;
-    }
-
     const client = s.default && typeof s.default.from === 'function' ? s.default : s;
-    if (client && typeof client.from === 'function') {
-        cachedSupabaseClient = client;
-        return cachedSupabaseClient;
-    }
-
-    return null;
+    return (client && typeof client.from === 'function') ? client : null;
 }
-
-// --- CREAR CITA Y ENVIAR A WHATSAPP ---
+// --- PROCESAR LA RESERVA DESDE EL FORMULARIO WEB ---
 window.handleCreateAppointment = async (e) => {
-    if (e && e.preventDefault) e.preventDefault();
-
-    const clientName = document.getElementById('appClientName')?.value.trim();
-    const clientPhone = document.getElementById('appClientPhone')?.value.trim();
-    const branch = document.getElementById('appBranchSelect')?.value;
+    e.preventDefault();
+    const clientName = document.getElementById('appClientName').value.trim();
+    const clientPhone = document.getElementById('appClientPhone').value.trim();
+    const branch = document.getElementById('appBranchSelect').value;
     const serviceSelectElement = document.getElementById('appServiceSelect');
-    const serviceId = serviceSelectElement?.value;
-    const staffId = document.getElementById('appStaffSelect')?.value;
-    const date = document.getElementById('appDate')?.value;
-    const time = document.getElementById('appTimeSelect')?.value;
-
+    const serviceId = serviceSelectElement.value;
+    const staffId = document.getElementById('appStaffSelect').value;
+    const date = document.getElementById('appDate').value;
+    const time = document.getElementById('appTimeSelect').value;
     if (!clientName || !clientPhone || !date || !time) {
         alert("Por favor completa todos los campos requeridos.");
         return;
     }
-
     let service = manicureServices.find(s => s.id === serviceId || s.name === serviceId);
-    if (!service && serviceSelectElement) {
-        const selectedText = serviceSelectElement.options[serviceSelectElement.selectedIndex]?.text || '';
+    if (!service) {
+        const selectedText = serviceSelectElement.options[serviceSelectElement.selectedIndex].text;
         service = {
             id: serviceId,
             name: selectedText.split('(')[0].trim() || serviceId,
             price: 25.00
         };
     }
-
     const staff = staffMembers.find(s => s.id === staffId);
-    const appointmentId = 'AVO-CIT-' + Math.floor(100000 + Math.random() * 900000);
-    const currentBcv = window.bcvRate || 832.49;
-    const totalBs = (service ? (service.price * currentBcv).toFixed(2) : '0.00');
+    const appointmentId = 'AVO-CIT-' + Math.floor(1000 + Math.random() * 9000);
+    const currentBcv = window.bcvRate || 36.50;
+    const totalBs = (service.price * currentBcv).toFixed(2);
     const staffNameFinal = staff ? staff.name : 'Asignación Automática';
-    const serviceNameFinal = service ? service.name : 'Servicio General';
-    const priceFinal = service ? service.price.toFixed(2) : '0.00';
-
     try {
         const client = getSupabaseClient();
         if (client) {
@@ -79,7 +52,7 @@ window.handleCreateAppointment = async (e) => {
                 codigo: appointmentId,
                 cliente: clientName,
                 telefono: clientPhone,
-                servicio: serviceNameFinal,
+                servicio: service.name,
                 sucursal_especialista: `${branch} (${staffNameFinal})`,
                 fecha_hora: `${date} - ${time}`,
                 estado: 'Pendiente'
@@ -89,28 +62,23 @@ window.handleCreateAppointment = async (e) => {
     } catch (err) {
         console.error('Excepción al conectar con Supabase:', err);
     }
-
     await loadAppointmentsFromSupabase();
-
     let msg = `✨ *SOLICITUD DE CITA - AVOCADO SPA* ✨\n\n`;
     msg += `🆔 *Cita:* #${appointmentId}\n`;
     msg += `👤 *Cliente:* ${clientName}\n`;
-    msg += `💅 *Servicio:* ${serviceNameFinal}\n`;
+    msg += `💅 *Servicio:* ${service.name}\n`;
     msg += `🏢 *Sucursal:* ${branch}\n`;
     msg += `👩‍🎨 *Especialista:* ${staffNameFinal}\n`;
     msg += `📅 *Fecha:* ${date}\n`;
     msg += `⏰ *Hora:* ${time}\n`;
-    msg += `💰 *Total:* $${priceFinal} (Bs. ${totalBs})\n\n`;
+    msg += `💰 *Total:* $${service.price.toFixed(2)} (Bs. ${totalBs})\n\n`;
     msg += `_Quedo a la espera de la confirmación de la cita._`;
-
     window.open(`https://wa.me/584143943252?text=${encodeURIComponent(msg)}`, '_blank');
-
-    const formEl = document.getElementById('appointmentForm') || document.getElementById('appForm') || document.querySelector('form');
-    if (formEl && typeof formEl.reset === 'function') formEl.reset();
+    const formEl = document.getElementById('appointmentForm') || document.querySelector('form');
+    if (formEl) formEl.reset();
     alert(`✅ Tu solicitud de cita #${appointmentId} ha sido enviada con éxito.`);
 };
-
-// --- CARGAR CITAS DESDE SUPABASE ---
+// --- CARGAR Y RENDERIZAR CITAS DESDE SUPABASE ---
 async function loadAppointmentsFromSupabase() {
     const client = getSupabaseClient();
     
@@ -122,15 +90,13 @@ async function loadAppointmentsFromSupabase() {
     const { data, error } = await client
         .from('appointments')
         .select('*');
-
     if (error) {
         console.error('Error al cargar citas de Supabase:', error.message);
         return;
     }
-
     if (data && data.length > 0) {
         window.appointments = data.map(item => ({
-            id: item.id,
+            id: item.id, // ID interno para operaciones de base de datos
             appointmentId: item.codigo || item.code || 'N/A',
             clientName: item.cliente || item.client_name || 'Sin nombre',
             clientPhone: item.telefono || item.client_phone || '',
@@ -144,10 +110,8 @@ async function loadAppointmentsFromSupabase() {
     }
     
     renderAppointmentsTableSafe();
-    renderAppointmentsScreen();
 }
-
-// ESTADOS Y ELIMINACIÓN DE CITAS
+// Función para cambiar el estado de la cita en tiempo real
 window.updateAppointmentStatus = async (appointmentId, newStatus) => {
     const client = getSupabaseClient();
     const app = window.appointments.find(a => a.appointmentId === appointmentId || a.id == appointmentId);
@@ -155,56 +119,49 @@ window.updateAppointmentStatus = async (appointmentId, newStatus) => {
     if (client && app) {
         const queryField = app.id ? 'id' : 'codigo';
         const queryValue = app.id || app.appointmentId;
-
         const { error } = await client
             .from('appointments')
             .update({ estado: newStatus })
             .eq(queryField, queryValue);
-
         if (error) {
+            console.error('Error al actualizar estado:', error.message);
             alert('No se pudo actualizar el estado en la base de datos.');
             return;
         }
     }
     await loadAppointmentsFromSupabase();
 };
-
+// Función para eliminar cita
 window.deleteAppointment = async (appointmentId) => {
     if (!confirm(`¿Estás seguro de eliminar la cita #${appointmentId}?`)) return;
-
     const client = getSupabaseClient();
     const app = window.appointments.find(a => a.appointmentId === appointmentId || a.id == appointmentId);
-
     if (client && app) {
         const queryField = app.id ? 'id' : 'codigo';
         const queryValue = app.id || app.appointmentId;
-
         const { error } = await client
             .from('appointments')
             .delete()
             .eq(queryField, queryValue);
-
         if (error) {
+            console.error('Error al eliminar cita:', error.message);
             alert('No se pudo eliminar la cita de la base de datos.');
             return;
         }
     }
     await loadAppointmentsFromSupabase();
 };
-
-// VISTAS DE TABLA ADMIN
+// Renderizar la tabla con diseño responsivo y selector interactivo
 function renderAppointmentsTableSafe() {
     const tbody = document.getElementById('appointmentsTableBody');
     if (!tbody) return;
-
     if (!window.appointments || window.appointments.length === 0) {
         tbody.innerHTML = `<tr><td colspan="7" class="text-center p-4 text-slate-400 text-xs">No hay citas registradas en la base de datos.</td></tr>`;
         return;
     }
-
     tbody.innerHTML = window.appointments.map(app => `
         <tr class="border-b text-xs text-slate-700 hover:bg-slate-50 transition">
-            <td class="p-2.5 font-bold font-mono">${app.appointmentId}</td>
+            <td class="p-2.5 font-bold">${app.appointmentId}</td>
             <td class="p-2.5"><strong>${app.clientName}</strong><br><span class="text-[11px] text-slate-400">${app.clientPhone}</span></td>
             <td class="p-2.5">${app.serviceName}</td>
             <td class="p-2.5">${app.staffName}</td>
@@ -218,7 +175,6 @@ function renderAppointmentsTableSafe() {
                     <option value="Pendiente" ${app.status === 'Pendiente' ? 'selected' : ''}>Pendiente</option>
                     <option value="En Verificación" ${app.status === 'En Verificación' ? 'selected' : ''}>En Verificación</option>
                     <option value="Verificado" ${app.status === 'Verificado' ? 'selected' : ''}>Verificado</option>
-                    <option value="Cancelado" ${app.status === 'Cancelado' ? 'selected' : ''}>Cancelado</option>
                 </select>
             </td>
             <td class="p-2.5 text-center">
@@ -228,61 +184,6 @@ function renderAppointmentsTableSafe() {
     `).join('');
 }
 
-// MODAL PANTALLA COMPLETA
-window.displayAppointmentsScreen = () => {
-    const modal = document.getElementById('appointmentsScreenModal');
-    if (modal) {
-        modal.classList.remove('hidden');
-        renderAppointmentsScreen();
-    }
-};
-
-window.closeAppointmentsScreen = () => {
-    const modal = document.getElementById('appointmentsScreenModal');
-    if (modal) modal.classList.add('hidden');
-};
-
-window.renderAppointmentsScreen = () => {
-    const tbody = document.getElementById('appointmentsScreenTableBody');
-    if (!tbody) return;
-
-    const query = (document.getElementById('appScreenSearch')?.value || '').toLowerCase();
-    const branchFilter = document.getElementById('appScreenBranchFilter')?.value || 'ALL';
-
-    const filtered = (window.appointments || []).filter(a => {
-        const matchesQuery = a.clientName.toLowerCase().includes(query) ||
-                             a.appointmentId.toLowerCase().includes(query) ||
-                             a.clientPhone.toLowerCase().includes(query);
-        const matchesBranch = branchFilter === 'ALL' || a.staffName.includes(branchFilter);
-        return matchesQuery && matchesBranch;
-    });
-
-    if (filtered.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="7" class="text-center p-6 text-slate-400 text-xs">No se encontraron citas coincidentes.</td></tr>`;
-        return;
-    }
-
-    tbody.innerHTML = filtered.map(app => `
-        <tr class="border-b text-xs text-slate-700 hover:bg-slate-50 transition">
-            <td class="p-3 font-bold font-mono text-slate-900">${app.appointmentId}</td>
-            <td class="p-3"><strong>${app.clientName}</strong><br><span class="text-[11px] text-slate-400">${app.clientPhone}</span></td>
-            <td class="p-3">${app.serviceName}</td>
-            <td class="p-3">${app.staffName}</td>
-            <td class="p-3">${app.dateTime}</td>
-            <td class="p-3">
-                <span class="px-2.5 py-1 rounded-full text-[10px] font-bold ${
-                    app.status === 'Verificado' || app.status === 'Confirmada' ? 'bg-emerald-100 text-emerald-800' :
-                    app.status === 'En Verificación' || app.status === 'Pendiente' ? 'bg-amber-100 text-amber-800' :
-                    'bg-red-100 text-red-800'
-                }">${app.status}</span>
-            </td>
-            <td class="p-3 text-center">
-                <button onclick="deleteAppointment('${app.appointmentId}')" class="bg-red-50 text-red-600 hover:bg-red-100 px-2.5 py-1 rounded-md text-xs font-bold transition">🗑️</button>
-            </td>
-        </tr>
-    `).join('');
-};
-
-// INICIALIZACIÓN
+// Inicializar al cargar la página
 window.addEventListener('DOMContentLoaded', loadAppointmentsFromSupabase);
 window.addEventListener('load', loadAppointmentsFromSupabase);

@@ -1,254 +1,802 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Avocado Shop Pro - Insumos Profesionales</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Avocado Shop | Insumos de uñas, cejas y pestañas</title>
+  
+  <!-- Estilos e Iconos -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  
+  <!-- Librerías de Generación PDF -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
+
+  <!-- SDK Cliente Supabase -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+  <style>
+    body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: #FAFAFA; }
+    .tab-btn.active { background-color: #059669; color: white; }
+
+    @media print {
+      body * { visibility: hidden; }
+      #printableArea, #printableArea *, #orderInvoicePrintArea, #orderInvoicePrintArea * { visibility: visible; }
+      #orderInvoicePrintArea { position: absolute; left: 0; top: 0; width: 100%; }
+      #printableArea { position: absolute; left: 0; top: 0; width: 100%; }
+      .no-print { display: none !important; }
+    }
+  </style>
 </head>
-<body class="bg-slate-50 text-slate-800 font-sans antialiased pb-20">
+<body class="text-gray-800">
 
-    <!-- BARRA NAVEGACIÓN PRINCIPAL -->
-    <header class="bg-white border-b sticky top-0 z-40 shadow-sm">
-        <div class="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between gap-4">
-            <div class="flex items-center gap-2 cursor-pointer" onclick="showSection('shop')">
-                <div class="flex flex-col">
-                    <span class="font-extrabold text-xl text-emerald-700 tracking-tight leading-none">Avocado Shop 🥑</span>
-                    <span class="text-[10px] text-slate-500 font-semibold mt-0.5">Insumos de uñas, cejas y pestañas</span>
-                </div>
-            </div>
-
-            <div class="hidden md:flex flex-1 max-w-md mx-4">
-                <input type="text" id="searchInput" oninput="filterProducts()" placeholder="Buscar geles, lámparas, brochas..." 
-                    class="w-full text-xs bg-slate-100 border border-transparent focus:border-emerald-500 focus:bg-white rounded-full px-4 py-2 outline-none transition">
-            </div>
-
-            <div class="flex items-center gap-3">
-                <div class="bg-slate-800 text-emerald-400 text-[11px] font-bold px-3 py-1.5 rounded-full flex items-center gap-1 shadow-inner">
-                    <span>BCV:</span>
-                    <span id="bcvRateBadge">Bs. 832.49</span>
-                </div>
-
-                <button onclick="showSection('shop')" class="text-xs font-bold text-slate-700 hover:text-emerald-600 px-2 py-1">Tienda</button>
-                <button onclick="showSection('tracking')" class="text-xs font-bold text-slate-700 hover:text-emerald-600 px-2 py-1">Rastreo</button>
-                <button onclick="displayAppointmentsScreen()" class="text-xs font-bold bg-indigo-50 text-indigo-700 hover:bg-indigo-100 px-3 py-1.5 rounded-lg border border-indigo-200 transition">🖥️ Citas</button>
-                <button onclick="toggleCartDrawer()" class="relative bg-slate-100 hover:bg-slate-200 p-2 rounded-full transition">
-                    🛒 <span id="cartCount" class="absolute -top-1 -right-1 bg-emerald-600 text-white text-[10px] font-bold w-5 h-5 rounded-full flex items-center justify-center">0</span>
-                </button>
-            </div>
+  <header class="sticky top-0 z-40 bg-white/90 backdrop-blur-md border-b border-gray-100 shadow-sm">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between gap-4">
+      
+      <!-- LOGO -->
+      <div class="flex flex-col cursor-pointer" onclick="switchTab('store')">
+        <div class="flex items-center gap-2">
+          <span class="text-2xl font-extrabold tracking-tight text-emerald-600">🥑 Avocado Shop</span>
+          <span class="text-xs bg-emerald-50 text-emerald-700 px-2.5 py-0.5 rounded-full font-semibold hidden sm:inline-block">Pro Nails</span>
         </div>
-    </header>
+        <span class="text-[11px] font-semibold text-emerald-800 tracking-tight -mt-0.5">
+          Insumos de uñas, cejas y pestañas 🥑
+        </span>
+      </div>
 
-    <!-- BANNER TASA BCV -->
-    <div class="bg-emerald-50 border-b border-emerald-100 py-2 px-4">
-        <div class="max-w-7xl mx-auto flex items-center justify-between text-xs font-bold text-emerald-900">
-            <span>🏛️ Tasa Oficial BCV: <strong id="bcvRateBanner">Bs. 832.49</strong></span>
-            <button onclick="openBcvModal()" class="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1 rounded-md text-[11px] transition">Modificar</button>
-        </div>
+      <!-- COMPONENTE TASA BCV -->
+      <div class="flex items-center gap-1.5 bg-gray-800/80 px-2.5 py-0.5 rounded-full border border-gray-700">
+        <span class="text-[11px] uppercase tracking-wider text-gray-400 font-semibold">BCV:</span>
+        <span id="bcvRateDisplay" class="font-mono font-bold text-emerald-400 text-xs">Cargando...</span>
+      </div>
+
+      <div class="flex-1 max-w-xs sm:max-w-md">
+        <input type="text" id="searchInput" placeholder="Buscar geles, lámparas, brocas..." 
+               class="w-full bg-gray-100 text-sm rounded-full px-4 py-2 border-none focus:ring-2 focus:ring-emerald-500 outline-none transition">
+      </div>
+
+      <div class="flex items-center gap-3">
+        <button onclick="switchTab('store')" class="nav-link text-xs font-bold text-gray-600 hover:text-emerald-600 px-3 py-1.5 rounded-lg">Tienda</button>
+        <button onclick="switchTab('tracking')" class="nav-link text-xs font-bold text-gray-600 hover:text-emerald-600 px-3 py-1.5 rounded-lg">Rastreo</button>
+        <button onclick="switchTab('admin')" class="nav-link text-xs font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 px-3 py-1.5 rounded-lg">Panel Admin</button>
+
+        <button id="btnOpenCart" class="relative p-2 bg-gray-100 rounded-full hover:bg-gray-200 transition">
+          🛒 <span id="cartBadge" class="absolute -top-1 -right-1 bg-emerald-600 text-white text-[10px] font-bold w-4 h-4 rounded-full flex items-center justify-center">0</span>
+        </button>
+      </div>
     </div>
+  </header>
 
-    <!-- SECCIÓN TIENDA / CATÁLOGO -->
-    <section id="shopSection" class="max-w-7xl mx-auto px-4 py-6">
-        <div class="flex items-center gap-2 overflow-x-auto pb-3 mb-4 scrollbar-none">
-            <button onclick="filterCategory('ALL')" class="category-btn active bg-emerald-600 text-white text-xs font-bold px-4 py-2 rounded-full whitespace-nowrap">Todos</button>
-            <button onclick="filterCategory('Preparadores y Bases')" class="category-btn bg-white border border-slate-200 text-slate-700 text-xs font-bold px-4 py-2 rounded-full whitespace-nowrap">Preparadores y Bases</button>
-            <button onclick="filterCategory('Esmaltes Semi')" class="category-btn bg-white border border-slate-200 text-slate-700 text-xs font-bold px-4 py-2 rounded-full whitespace-nowrap">Esmaltes Semi</button>
-            <button onclick="filterCategory('Sistemas Constructores')" class="category-btn bg-white border border-slate-200 text-slate-700 text-xs font-bold px-4 py-2 rounded-full whitespace-nowrap">Sistemas Constructores</button>
+  <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+
+    <section id="tab-store" class="tab-content">
+      <div class="flex md:hidden items-center justify-between bg-emerald-50 border border-emerald-200 px-4 py-2 rounded-xl text-xs font-bold text-emerald-900 mb-4">
+        <span>🏛️ Tasa Oficial BCV: <strong id="bcvRateDisplayMobile" class="text-emerald-700">Cargando...</strong></span>
+        <button onclick="updateBcvRatePrompt()" class="bg-emerald-600 text-white text-[10px] px-2.5 py-1 rounded-md">Modificar</button>
+      </div>
+
+      <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+        <div class="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-none" id="categoryFilters">
+          <button class="cat-filter active px-4 py-2 rounded-full text-xs font-semibold bg-emerald-600 text-white" data-cat="all">Todos</button>
+          <button class="cat-filter px-4 py-2 rounded-full text-xs font-semibold bg-white text-gray-600 hover:bg-gray-100" data-cat="Preparadores y Bases">Preparadores y Bases</button>
+          <button class="cat-filter px-4 py-2 rounded-full text-xs font-semibold bg-white text-gray-600 hover:bg-gray-100" data-cat="Esmaltes Semi">Esmaltes Semi</button>
+          <button class="cat-filter px-4 py-2 rounded-full text-xs font-semibold bg-white text-gray-600 hover:bg-gray-100" data-cat="Sistemas Constructores">Sistemas Constructores</button>
+          <button class="cat-filter px-4 py-2 rounded-full text-xs font-semibold bg-white text-gray-600 hover:bg-gray-100" data-cat="Herramientas y Lámparas">Herramientas y Lámparas</button>
         </div>
 
-        <div class="bg-emerald-50/60 border border-emerald-100 p-3 rounded-xl mb-6 flex items-center justify-between max-w-sm">
-            <label class="text-xs font-bold text-emerald-900">📍 Sucursal:</label>
-            <select id="branchFilterSelect" onchange="filterProducts()" class="bg-white border text-slate-800 font-bold text-xs rounded-lg px-3 py-1.5 outline-none cursor-pointer">
-                <option value="ALL">Todas las Sucursales</option>
-                <option value="San Félix">San Félix</option>
-                <option value="CC Alta Vista I">CC Alta Vista I</option>
-                <option value="CC Alta Vista II">CC Alta Vista II</option>
+        <div class="flex items-center gap-2 bg-emerald-50 px-3 py-1.5 rounded-xl border border-emerald-100">
+          <span class="text-xs font-bold text-emerald-800">📍 Sucursal:</span>
+          <select id="userBranchSelect" class="bg-transparent text-xs font-semibold text-emerald-900 outline-none cursor-pointer">
+            <option value="ALL">Todas las Sucursales</option>
+            <option value="San Félix">San Félix</option>
+            <option value="CC Alta Vista I">CC Alta Vista I</option>
+            <option value="CC Alta Vista II">CC Alta Vista II</option>
+          </select>
+        </div>
+      </div>
+
+      <div id="productGrid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4"></div>
+
+      <!-- SECCIÓN DE RESERVAS ONLINE CLIENTE -->
+      <section class="max-w-4xl mx-auto my-12 p-6 bg-white rounded-2xl border border-slate-100 shadow-sm">
+        <div class="text-center mb-6">
+          <span class="bg-emerald-100 text-emerald-800 text-xs font-bold px-3 py-1 rounded-full uppercase tracking-wider">Avocado Spa & Nails</span>
+          <h2 class="text-2xl font-extrabold text-slate-800 mt-2">Reserva tu Cita de Manicura</h2>
+          <p class="text-xs text-slate-500">Elige tu servicio favorito, especialista y horario en pocos pasos.</p>
+        </div>
+
+        <form id="appointmentForm" onsubmit="handleCreateAppointment(event)" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label class="block text-xs font-semibold text-slate-600 mb-1">Nombre Completo *</label>
+            <input type="text" id="appClientName" required placeholder="Ej. María Delgado" class="w-full text-xs border rounded-lg p-2.5 outline-none focus:ring-2 focus:ring-emerald-500">
+          </div>
+
+          <div>
+            <label class="block text-xs font-semibold text-slate-600 mb-1">WhatsApp de Contacto *</label>
+            <input type="tel" id="appClientPhone" required placeholder="Ej. 584143943252" class="w-full text-xs border rounded-lg p-2.5 outline-none focus:ring-2 focus:ring-emerald-500">
+          </div>
+
+          <div>
+            <label class="block text-xs font-semibold text-slate-600 mb-1">Sucursal *</label>
+            <select id="appBranchSelect" class="w-full text-xs border rounded-lg p-2.5 outline-none focus:ring-2 focus:ring-emerald-500">
+              <option value="San Félix">San Félix</option>
+              <option value="CC Alta Vista I">CC Alta Vista I</option>
+              <option value="CC Alta Vista II">CC Alta Vista II</option>
             </select>
-        </div>
+          </div>
 
-        <div id="productsGrid" class="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-            <!-- Productos cargados dinámicamente -->
-        </div>
-    </section>
+          <div>
+            <label class="block text-xs font-semibold text-slate-600 mb-1">Servicio *</label>
+            <select id="appServiceSelect" class="w-full text-xs border rounded-lg p-2.5 outline-none focus:ring-2 focus:ring-emerald-500">
+              <option value="srv-1">Manicura Rusa + Gelificación ($25.00)</option>
+              <option value="srv-2">Sistema de Uñas Polygel ($35.00)</option>
+              <option value="srv-3">Pedicura Spa + Semipermanente ($20.00)</option>
+              <option value="srv-4">Mantenimiento / Retiro ($15.00)</option>
+            </select>
+          </div>
 
-    <!-- MÓDULO FORMULARIO DE CITAS -->
-    <section id="appointmentSection" class="max-w-4xl mx-auto px-4 py-8">
-        <div class="bg-white rounded-2xl shadow-sm border p-6 md:p-8">
-            <div class="text-center mb-6">
-                <span class="text-[11px] font-bold tracking-widest text-emerald-600 uppercase bg-emerald-50 px-3 py-1 rounded-full">AVOCADO SPA & NAILS</span>
-                <h2 class="text-2xl font-extrabold text-slate-800 mt-2">Reserva tu Cita de Manicura</h2>
-            </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-600 mb-1">Manicurista Preferida</label>
+            <select id="appStaffSelect" class="w-full text-xs border rounded-lg p-2.5 outline-none focus:ring-2 focus:ring-emerald-500">
+              <option value="stf-1">Valeria Gómez (Nail Art & Polygel)</option>
+              <option value="stf-2">Camila Rivas (Manicura Rusa)</option>
+              <option value="stf-3">Daniela Torres (Pedicura Spa & Gel)</option>
+            </select>
+          </div>
 
-            <form id="appointmentForm" onsubmit="handleCreateAppointment(event)" class="space-y-4">
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                        <label class="block text-xs font-semibold text-slate-600 mb-1">Nombre Completo *</label>
-                        <input type="text" id="appClientName" required placeholder="Ej. María Delgado" class="w-full text-xs border rounded-lg p-2.5 outline-none focus:ring-2 focus:ring-emerald-500">
-                    </div>
-                    <div>
-                        <label class="block text-xs font-semibold text-slate-600 mb-1">Teléfono *</label>
-                        <input type="tel" id="appClientPhone" required placeholder="04141234567" class="w-full text-xs border rounded-lg p-2.5 outline-none focus:ring-2 focus:ring-emerald-500">
-                    </div>
-                </div>
-
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                        <label class="block text-xs font-semibold text-slate-600 mb-1">Sucursal *</label>
-                        <select id="appBranchSelect" class="w-full text-xs border rounded-lg p-2.5 outline-none focus:ring-2 focus:ring-emerald-500">
-                            <option value="San Félix">San Félix</option>
-                            <option value="CC Alta Vista I">CC Alta Vista I</option>
-                            <option value="CC Alta Vista II">CC Alta Vista II</option>
-                        </select>
-                    </div>
-                    <div>
-                        <label class="block text-xs font-semibold text-slate-600 mb-1">Servicio *</label>
-                        <select id="appServiceSelect" class="w-full text-xs border rounded-lg p-2.5 outline-none focus:ring-2 focus:ring-emerald-500">
-                            <option value="srv-1">Manicura Rusa + Gelificación ($25.00)</option>
-                            <option value="srv-2">Sistema de Uñas Polygel ($35.00)</option>
-                            <option value="srv-3">Pedicura Spa + Semipermanente ($20.00)</option>
-                            <option value="srv-4">Mantenimiento / Retiro ($15.00)</option>
-                        </select>
-                    </div>
-                </div>
-
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div>
-                        <label class="block text-xs font-semibold text-slate-600 mb-1">Especialista</label>
-                        <select id="appStaffSelect" class="w-full text-xs border rounded-lg p-2.5 outline-none focus:ring-2 focus:ring-emerald-500">
-                            <option value="stf-1">Valeria Gómez (Nail Art & Polygel)</option>
-                            <option value="stf-2">Camila Rivas (Manicura Rusa)</option>
-                            <option value="stf-3">Daniela Torres (Pedicura Spa & Gel)</option>
-                        </select>
-                    </div>
-                    <div>
-                        <label class="block text-xs font-semibold text-slate-600 mb-1">Fecha *</label>
-                        <input type="date" id="appDate" required class="w-full text-xs border rounded-lg p-2.5 outline-none focus:ring-2 focus:ring-emerald-500">
-                    </div>
-                    <div>
-                        <label class="block text-xs font-semibold text-slate-600 mb-1">Hora *</label>
-                        <select id="appTimeSelect" class="w-full text-xs border rounded-lg p-2.5 outline-none focus:ring-2 focus:ring-emerald-500">
-                            <option value="09:00 AM">09:00 AM</option>
-                            <option value="11:00 AM">11:00 AM</option>
-                            <option value="02:00 PM">02:00 PM</option>
-                            <option value="04:00 PM">04:00 PM</option>
-                        </select>
-                    </div>
-                </div>
-
-                <button type="submit" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 rounded-xl transition text-xs shadow-md">
-                    🗓️ Reservar Cita vía WhatsApp
-                </button>
-            </form>
-        </div>
-    </section>
-
-    <!-- DRAWER LATERAL: CARRITO DE COMPRAS Y CHECKOUT -->
-    <div id="cartDrawer" class="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 hidden flex justify-end">
-        <div class="bg-white w-full max-w-md h-full shadow-2xl flex flex-col justify-between p-6 overflow-y-auto">
+          <div class="grid grid-cols-2 gap-2">
             <div>
-                <div class="flex items-center justify-between pb-4 border-b">
-                    <h2 class="text-lg font-bold text-slate-800">🛒 Tu Carrito de Compras</h2>
-                    <button onclick="toggleCartDrawer()" class="text-slate-400 hover:text-slate-600 font-bold text-xl">✕</button>
-                </div>
-                <div id="cartItems" class="space-y-3 my-4"></div>
+              <label class="block text-xs font-semibold text-slate-600 mb-1">Fecha *</label>
+              <input type="date" id="appDate" required class="w-full text-xs border rounded-lg p-2.5 outline-none focus:ring-2 focus:ring-emerald-500">
             </div>
+            <div>
+              <label class="block text-xs font-semibold text-slate-600 mb-1">Hora *</label>
+              <select id="appTimeSelect" class="w-full text-xs border rounded-lg p-2.5 outline-none focus:ring-2 focus:ring-emerald-500">
+                <option value="09:00 AM">09:00 AM</option>
+                <option value="10:30 AM">10:30 AM</option>
+                <option value="01:00 PM">01:00 PM</option>
+                <option value="02:30 PM">02:30 PM</option>
+                <option value="04:00 PM">04:00 PM</option>
+              </select>
+            </div>
+          </div>
 
-            <div class="border-t pt-4">
-                <form id="checkoutForm" onsubmit="handleCheckout(event)" class="space-y-3">
-                    <div>
-                        <label class="block text-[11px] font-bold text-slate-600 mb-1">Nombre Completo *</label>
-                        <input type="text" id="cName" required class="w-full border rounded-lg p-2 text-xs outline-none">
-                    </div>
-                    <div class="grid grid-cols-2 gap-2">
-                        <div>
-                            <label class="block text-[11px] font-bold text-slate-600 mb-1">C.I / RIF *</label>
-                            <input type="text" id="cDoc" required placeholder="V-12345678" class="w-full border rounded-lg p-2 text-xs outline-none">
-                        </div>
-                        <div>
-                            <label class="block text-[11px] font-bold text-slate-600 mb-1">Teléfono *</label>
-                            <input type="tel" id="cPhone" required placeholder="04141234567" class="w-full border rounded-lg p-2 text-xs outline-none">
-                        </div>
-                    </div>
-                    <div>
-                        <label class="block text-[11px] font-bold text-slate-600 mb-1">Método de Entrega *</label>
-                        <select id="cDelivery" onchange="toggleDeliveryFields()" class="w-full border rounded-lg p-2 text-xs outline-none font-medium">
-                            <option value="pickup">Retiro en Tienda (Gratis)</option>
-                            <option value="delivery">Delivery ($3.00 Adicional)</option>
-                        </select>
-                    </div>
-                    <div id="branchSelectContainer">
-                        <label class="block text-[11px] font-bold text-slate-600 mb-1">Seleccionar Sucursal *</label>
-                        <select id="cBranch" class="w-full border rounded-lg p-2 text-xs outline-none font-medium">
-                            <option value="San Félix">San Félix</option>
-                            <option value="CC Alta Vista I">CC Alta Vista I</option>
-                            <option value="CC Alta Vista II">CC Alta Vista II</option>
-                        </select>
-                    </div>
-                    <div id="addressContainer" class="hidden">
-                        <label class="block text-[11px] font-bold text-slate-600 mb-1">Dirección de Envío Exacta *</label>
-                        <textarea id="cAddress" rows="2" class="w-full border rounded-lg p-2 text-xs outline-none" placeholder="Indica sector, calle, punto de referencia..."></textarea>
-                    </div>
-                    <div>
-                        <label class="block text-[11px] font-bold text-slate-600 mb-1">Número de Referencia (Pago Móvil) *</label>
-                        <input type="text" id="cRef" required placeholder="Ej: 984012" class="w-full border rounded-lg p-2 text-xs outline-none">
-                    </div>
-                    <button type="submit" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 rounded-xl transition text-xs shadow-md">
-                        🚀 Confirmar Pedido y Enviar WhatsApp
-                    </button>
-                </form>
-            </div>
+          <div class="md:col-span-2 mt-2">
+            <button type="submit" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 rounded-xl transition text-xs shadow-md">
+              📅 Agendar y Enviar Cita por WhatsApp
+            </button>
+          </div>
+        </form>
+      </section>
+    </section>
+
+    <section id="tab-tracking" class="tab-content hidden">
+      <div class="max-w-md mx-auto bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
+        <h2 class="text-xl font-bold text-center text-gray-800 mb-2">📦 Tracking de Pedidos</h2>
+        <p class="text-xs text-center text-gray-500 mb-6">Ingresa tu código de orden (ej: AVO-849201)</p>
+        
+        <div class="flex gap-2 mb-6">
+          <input type="text" id="trackInput" placeholder="AVO-XXXXXX" class="flex-1 border rounded-xl p-2.5 text-sm outline-none focus:ring-2 focus:ring-emerald-500">
+          <button onclick="searchOrderTracking()" class="bg-emerald-600 text-white font-bold px-4 py-2.5 rounded-xl hover:bg-emerald-700 text-sm">Consultar</button>
         </div>
-    </div>
 
-    <!-- MODAL CITAS PANTALLA COMPLETA -->
-    <div id="appointmentsScreenModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
-        <div class="bg-white w-full max-w-5xl rounded-2xl shadow-2xl border flex flex-col max-h-[90vh]">
-            <div class="p-4 border-b flex items-center justify-between bg-slate-50 rounded-t-2xl">
-                <h3 class="font-extrabold text-slate-900 text-base">🖥️ Pantalla General de Citas</h3>
-                <button onclick="closeAppointmentsScreen()" class="text-slate-400 hover:text-slate-700 text-xl font-bold p-1">✕</button>
-            </div>
-            <div class="p-4 border-b bg-white flex flex-wrap gap-3 items-center justify-between">
-                <input type="text" id="appScreenSearch" oninput="renderAppointmentsScreen()" placeholder="🔍 Buscar por cliente o código..." class="text-xs p-2.5 border rounded-lg w-full md:w-64 outline-none">
-                <select id="appScreenBranchFilter" onchange="renderAppointmentsScreen()" class="text-xs p-2.5 border rounded-lg bg-slate-50 font-bold outline-none">
-                    <option value="ALL">Todas las sucursales</option>
-                    <option value="San Félix">San Félix</option>
-                    <option value="CC Alta Vista I">CC Alta Vista I</option>
-                    <option value="CC Alta Vista II">CC Alta Vista II</option>
+        <div id="trackResult" class="hidden border-t pt-4">
+          <div class="flex justify-between items-center mb-3">
+            <span class="text-xs text-gray-500">Estado:</span>
+            <span id="trackStatus" class="text-xs font-bold bg-amber-50 text-amber-700 px-2.5 py-1 rounded-full">En Verificación</span>
+          </div>
+          <div class="text-xs text-gray-600 space-y-2">
+            <p><strong>Cliente:</strong> <span id="trackClient">------</span></p>
+            <p><strong>Método de Entrega:</strong> <span id="trackDeliveryType">------</span></p>
+            <p><strong>Sucursal/Dirección:</strong> <span id="trackBranch">------</span></p>
+            <p><strong>Referencia Pago Móvil:</strong> <span id="trackRef">------</span></p>
+            <p><strong>Total Orden:</strong> <span id="trackTotal">$0.00</span></p>
+          </div>
+          <button id="btnDownloadTrackInvoice" class="w-full mt-4 bg-slate-900 text-white text-xs font-bold py-2.5 rounded-xl hover:bg-black transition flex items-center justify-center gap-2">
+            📄 Descargar Factura PDF
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <section id="tab-admin" class="tab-content hidden">
+      <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+        <div>
+          <h1 class="text-2xl font-bold text-slate-900">🥑 Dashboard Administrativo</h1>
+          <p class="text-xs text-slate-500" id="adminHeaderSub">Control Multi-Sucursal de Inventario, Vendedores y Facturación en Tiempo Real</p>
+        </div>
+
+        <div class="flex flex-wrap items-center gap-2">
+          <button onclick="exportDataJSON()" class="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-sm">
+            📥 Exportar JSON
+          </button>
+          
+          <label for="importJsonInput" class="bg-amber-600 hover:bg-amber-700 text-white px-3 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-sm">
+            📤 Importar JSON
+          </label>
+          <input type="file" id="importJsonInput" accept=".json" class="hidden" onchange="importDataJSON(event)">
+
+          <div class="flex items-center gap-2 bg-white px-4 py-2 rounded-xl border border-slate-200 shadow-sm ml-auto md:ml-0">
+            <span class="text-xs font-bold text-slate-600">🔒 Acceso Sucursal:</span>
+            <select id="adminBranchFilter" onchange="handleBranchAccessChange(this)" class="bg-transparent text-xs font-bold text-slate-800 outline-none cursor-pointer">
+              <option value="ALL">Todas las Sucursales (Global)</option>
+              <option value="San Félix">San Félix</option>
+              <option value="CC Alta Vista I">CC Alta Vista I</option>
+              <option value="CC Alta Vista II">CC Alta Vista II</option>
+            </select>
+          </div>
+          <button onclick="logoutAdmin()" class="bg-red-50 text-red-600 hover:bg-red-100 px-3 py-2 rounded-xl text-xs font-bold transition">
+            🚪 Salir
+          </button>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+        <div class="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm">
+          <div class="flex justify-between items-center mb-2">
+            <span class="text-xs font-bold text-slate-500">San Félix</span>
+            <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
+          </div>
+          <p class="text-xl font-black text-slate-800" id="stat-sanfelix">$0.00</p>
+          <p class="text-[10px] text-slate-400 mt-1" id="stock-sanfelix">Stock: 0 unidades</p>
+        </div>
+
+        <div class="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm">
+          <div class="flex justify-between items-center mb-2">
+            <span class="text-xs font-bold text-amber-600">🛵 Ventas por Delivery</span>
+            <span class="w-2 h-2 rounded-full bg-amber-500"></span>
+          </div>
+          <p class="text-xl font-black text-slate-800" id="stat-delivery">$0.00</p>
+          <p class="text-[10px] text-slate-400 mt-1" id="count-delivery">0 pedidos registrados</p>
+        </div>
+
+        <div class="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm">
+          <div class="flex justify-between items-center mb-2">
+            <span class="text-xs font-bold text-slate-500">CC Alta Vista I</span>
+            <span class="w-2 h-2 rounded-full bg-blue-500"></span>
+          </div>
+          <p class="text-xl font-black text-slate-800" id="stat-altavista1">$0.00</p>
+          <p class="text-[10px] text-slate-400 mt-1" id="stock-altavista1">Stock: 0 unidades</p>
+        </div>
+
+        <div class="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm">
+          <div class="flex justify-between items-center mb-2">
+            <span class="text-xs font-bold text-slate-500">CC Alta Vista II</span>
+            <span class="w-2 h-2 rounded-full bg-purple-500"></span>
+          </div>
+          <p class="text-xl font-black text-slate-800" id="stat-altavista2">$0.00</p>
+          <p class="text-[10px] text-slate-400 mt-1" id="stock-altavista2">Stock: 0 unidades</p>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        
+        <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 h-fit space-y-6">
+          <div>
+            <h2 class="text-md font-bold mb-4 text-slate-800">Subir Producto Nuevo</h2>
+            <form id="adminProductForm" onsubmit="handleCreateProduct(event)" class="space-y-3">
+              <div>
+                <label class="block text-xs font-semibold text-slate-600 mb-1">Nombre del Producto</label>
+                <input type="text" id="pName" required placeholder="Ej: Gel Base Rubber" class="w-full border rounded-lg p-2 text-xs outline-none focus:ring-1 focus:ring-emerald-500">
+              </div>
+              <div>
+                <label class="block text-xs font-semibold text-slate-600 mb-1">
+                  📱 Subir Imágenes (Galería - Carga Secuencial)
+                </label>
+                <input 
+                  type="file" 
+                  id="pImage" 
+                  accept="image/png, image/jpeg, image/jpg" 
+                  multiple 
+                  onchange="handleSequentialFilesSelect(event)" 
+                  class="w-full text-xs text-slate-500 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-emerald-50 file:text-emerald-700 hover:file:bg-emerald-100 cursor-pointer border rounded-lg p-1 outline-none">
+                <p class="text-[10px] text-slate-400 mt-1">Puedes seleccionar una o más imágenes ordenadas secuencialmente desde tu galería.</p>
+              </div>
+
+              <!-- Contenedor dinámico de previsualización -->
+              <div id="sequentialPreviewContainer" class="space-y-2 my-2 max-h-40 overflow-y-auto"></div>
+              
+              <div>
+                <label class="block text-xs font-semibold text-slate-600 mb-1">Categoría</label>
+                <select id="pCategory" class="w-full border rounded-lg p-2 text-xs outline-none">
+                  <option>Preparadores y Bases</option>
+                  <option>Esmaltes Semi</option>
+                  <option>Sistemas Constructores</option>
+                  <option>Herramientas y Lámparas</option>
                 </select>
-            </div>
-            <div class="p-4 overflow-y-auto flex-1">
-                <table class="w-full text-left border-collapse">
-                    <thead>
-                        <tr class="bg-slate-100 text-[11px] font-bold text-slate-600 uppercase border-b">
-                            <th class="p-3">Código</th>
-                            <th class="p-3">Cliente</th>
-                            <th class="p-3">Servicio</th>
-                            <th class="p-3">Sucursal / Especialista</th>
-                            <th class="p-3">Fecha / Hora</th>
-                            <th class="p-3">Estado</th>
-                            <th class="p-3 text-center">Acción</th>
-                        </tr>
-                    </thead>
-                    <tbody id="appointmentsScreenTableBody"></tbody>
-                </table>
-            </div>
+              </div>
+              <div>
+                <label class="block text-xs font-semibold text-slate-600 mb-1">Sucursal Destino</label>
+                <select id="pBranch" class="w-full border rounded-lg p-2 text-xs outline-none font-medium">
+                  <option value="San Félix">San Félix</option>
+                  <option value="CC Alta Vista I">CC Alta Vista I</option>
+                  <option value="CC Alta Vista II">CC Alta Vista II</option>
+                </select>
+              </div>
+              <div class="grid grid-cols-2 gap-2">
+                <div>
+                  <label class="block text-xs font-semibold text-slate-600 mb-1">Precio ($)</label>
+                  <input type="number" step="0.01" id="pPrice" required class="w-full border rounded-lg p-2 text-xs outline-none">
+                </div>
+                <div>
+                  <label class="block text-xs font-semibold text-slate-600 mb-1">Stock Inicial</label>
+                  <input type="number" id="pStock" required class="w-full border rounded-lg p-2 text-xs outline-none">
+                </div>
+              </div>
+              <button type="submit" class="w-full bg-emerald-600 text-white font-bold py-2.5 rounded-xl hover:bg-emerald-700 transition text-xs">Guardar en Base de Datos</button>
+            </form>
+          </div>
         </div>
-    </div>
 
-    <script src="appointments.js"></script>
-    <script>
-        function toggleCartDrawer() {
-            document.getElementById('cartDrawer').classList.toggle('hidden');
-        }
-        function toggleDeliveryFields() {
-            const isDelivery = document.getElementById('cDelivery').value === 'delivery';
-            document.getElementById('addressContainer').classList.toggle('hidden', !isDelivery);
-            document.getElementById('branchSelectContainer').classList.toggle('hidden', isDelivery);
-        }
-        function showSection(sec) {
-            document.getElementById('shopSection').classList.toggle('hidden', sec !== 'shop');
-        }
-    </script>
+        <div class="lg:col-span-2 space-y-6">
+          <!-- MÓDULO ADMINISTRATIVO DE AGENDA -->
+          <button onclick="displayAppointmentsScreen()" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-semibold transition flex items-center gap-2 shadow-sm">
+            🖥️ Pantalla de Citas
+          </button>
+          <div class="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm">
+            <div class="flex items-center justify-between mb-4">
+              <div>
+                <h3 class="font-bold text-slate-800 text-base">🗓️ Agenda del Centro de Manicura</h3>
+                <p class="text-xs text-slate-400">Control de citas, estado del servicio y envío de recordatorios automáticos.</p>
+              </div>
+            </div>
+
+            <div class="overflow-x-auto">
+              <table class="w-full text-left border-collapse">
+                <thead>
+                  <tr class="bg-slate-50 text-[11px] font-bold text-slate-600 border-b">
+                    <th class="p-2.5">Código</th>
+                    <th class="p-2.5">Cliente</th>
+                    <th class="p-2.5">Servicio</th>
+                    <th class="p-2.5">Sucursal / Especialista</th>
+                    <th class="p-2.5">Fecha y Hora</th>
+                    <th class="p-2.5">Estado</th>
+                    <th class="p-2.5 text-center">Acciones</th>
+                  </tr>
+                </thead>
+                <tbody id="appointmentsTableBody">
+                  <!-- Render dinámico desde Supabase -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-100">
+            <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-4">
+              <div>
+                <h3 class="text-sm font-bold text-slate-800">📋 Inventario de Productos Sincronizado</h3>
+                <p class="text-[11px] text-slate-400">Gestiona existencias en tiempo real desde celular o web</p>
+              </div>
+              
+              <div class="flex items-center gap-2">
+                <button onclick="displayInventoryScreen()" class="bg-slate-800 text-white px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-black transition flex items-center gap-1.5">
+                  🖥️ Ver en Pantalla
+                </button>
+                <button onclick="printInventoryReport()" class="bg-emerald-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-emerald-700 transition flex items-center gap-1.5">
+                  🖨️ Imprimir / PDF
+                </button>
+              </div>
+            </div>
+
+            <div class="overflow-x-auto">
+              <table class="w-full text-left text-xs">
+                <thead class="bg-slate-50 text-slate-500 font-semibold">
+                  <tr>
+                    <th class="p-2.5">SKU</th>
+                    <th class="p-2.5">Producto</th>
+                    <th class="p-2.5">Categoría</th>
+                    <th class="p-2.5">Sucursal</th>
+                    <th class="p-2.5">Precio ($)</th>
+                    <th class="p-2.5">Stock</th>
+                    <th class="p-2.5">Estado</th>
+                    <th class="p-2.5 text-center">Acciones</th>
+                  </tr>
+                </thead>
+                <tbody id="inventoryTableBody" class="divide-y divide-slate-100"></tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-100">
+            <div class="flex justify-between items-center mb-3">
+              <h3 class="text-sm font-bold text-slate-800">Vendedores & Comisiones</h3>
+              <button onclick="addSellerPrompt()" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-3 py-1.5 rounded-lg transition flex items-center gap-1">
+                ➕ Agregar Vendedor
+              </button>
+            </div>
+            <div class="overflow-x-auto">
+              <table class="w-full text-left text-xs">
+                <thead class="bg-slate-50 text-slate-500 font-semibold">
+                  <tr>
+                    <th class="p-2.5">Vendedor</th>
+                    <th class="p-2.5">Sucursal</th>
+                    <th class="p-2.5">Ventas Acumuladas</th>
+                    <th class="p-2.5">% Comisión</th>
+                    <th class="p-2.5">Comisión ($)</th>
+                    <th class="p-2.5 text-center">Acciones</th>
+                  </tr>
+                </thead>
+                <tbody id="sellersTableBody" class="divide-y divide-slate-100"></tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-100">
+            <h3 class="text-sm font-bold text-slate-800 mb-3">Historial de Órdenes</h3>
+            <div class="overflow-x-auto">
+              <table class="w-full text-left text-xs">
+                <thead class="bg-slate-50 text-slate-500 font-semibold">
+                  <tr>
+                    <th class="p-2.5">Orden</th>
+                    <th class="p-2.5">Cliente</th>
+                    <th class="p-2.5">Entrega</th>
+                    <th class="p-2.5">Total</th>
+                    <th class="p-2.5">Ref. Pago</th>
+                    <th class="p-2.5">Estado</th>
+                    <th class="p-2.5 text-center">Acciones</th>
+                  </tr>
+                </thead>
+                <tbody id="ordersTableBody" class="divide-y divide-slate-100"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- MODALES -->
+  <div id="editProductModal" class="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 hidden flex justify-center items-center p-4">
+    <div class="bg-white w-full max-w-md rounded-2xl shadow-xl overflow-hidden">
+      <div class="p-4 bg-slate-900 text-white flex justify-between items-center">
+        <h3 class="text-sm font-bold">✏️ Editar Producto</h3>
+        <button onclick="closeEditProductModal()" class="text-slate-400 hover:text-white">✕</button>
+      </div>
+      <form id="editProductForm" onsubmit="saveEditedProduct(event)" class="p-4 space-y-3">
+        <input type="hidden" id="editPIdx">
+        <div>
+          <label class="block text-xs font-semibold text-slate-600 mb-1">Nombre</label>
+          <input type="text" id="editPName" required class="w-full border rounded-lg p-2 text-xs outline-none focus:ring-1 focus:ring-emerald-500">
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-slate-600 mb-1">Categoría</label>
+          <select id="editPCategory" class="w-full border rounded-lg p-2 text-xs outline-none">
+            <option>Preparadores y Bases</option>
+            <option>Esmaltes Semi</option>
+            <option>Sistemas Constructores</option>
+            <option>Herramientas y Lámparas</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-slate-600 mb-1">Sucursal</label>
+          <select id="editPBranch" class="w-full border rounded-lg p-2 text-xs outline-none font-medium">
+            <option value="San Félix">San Félix</option>
+            <option value="CC Alta Vista I">CC Alta Vista I</option>
+            <option value="CC Alta Vista II">CC Alta Vista II</option>
+          </select>
+        </div>
+        <div class="grid grid-cols-2 gap-2">
+          <div>
+            <label class="block text-xs font-semibold text-slate-600 mb-1">Precio ($)</label>
+            <input type="number" step="0.01" id="editPPrice" required class="w-full border rounded-lg p-2 text-xs outline-none">
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-600 mb-1">Stock Actual</label>
+            <input type="number" id="editPStock" required class="w-full border rounded-lg p-2 text-xs outline-none">
+          </div>
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-slate-600 mb-1">Reemplazar Imagen (.PNG / .JPG)</label>
+          <input type="file" id="editPImage" accept="image/png, image/jpeg, image/jpg" class="w-full text-xs text-slate-500 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-emerald-50 file:text-emerald-700 hover:file:bg-emerald-100 cursor-pointer border rounded-lg p-1 outline-none">
+          <p class="text-[10px] text-slate-400 mt-1">Si no seleccionas un archivo nuevo, mantendrá la imagen actual.</p>
+        </div>
+        <div class="flex justify-end gap-2 pt-2">
+          <button type="button" onclick="closeEditProductModal()" class="px-3 py-2 bg-gray-200 text-gray-700 font-bold rounded-xl text-xs">Cancelar</button>
+          <button type="submit" class="px-4 py-2 bg-emerald-600 text-white font-bold rounded-xl text-xs hover:bg-emerald-700">Guardar Cambios</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div id="editSellerModal" class="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 hidden flex justify-center items-center p-4">
+    <div class="bg-white w-full max-w-sm rounded-2xl shadow-xl overflow-hidden">
+      <div class="p-4 bg-slate-900 text-white flex justify-between items-center">
+        <h3 class="text-sm font-bold">✏️ Editar Vendedor</h3>
+        <button onclick="closeEditSellerModal()" class="text-slate-400 hover:text-white">✕</button>
+      </div>
+      <form id="editSellerForm" onsubmit="saveEditedSeller(event)" class="p-4 space-y-3">
+        <input type="hidden" id="editSIdx">
+        <div>
+          <label class="block text-xs font-semibold text-slate-600 mb-1">Nombre</label>
+          <input type="text" id="editSName" required class="w-full border rounded-lg p-2 text-xs outline-none focus:ring-1 focus:ring-emerald-500">
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-slate-600 mb-1">Sucursal Asignada</label>
+          <select id="editSBranch" class="w-full border rounded-lg p-2 text-xs outline-none font-medium">
+            <option value="San Félix">San Félix</option>
+            <option value="CC Alta Vista I">CC Alta Vista I</option>
+            <option value="CC Alta Vista II">CC Alta Vista II</option>
+          </select>
+        </div>
+        <div class="grid grid-cols-2 gap-2">
+          <div>
+            <label class="block text-xs font-semibold text-slate-600 mb-1">Ventas ($)</label>
+            <input type="number" step="0.01" id="editSSales" required class="w-full border rounded-lg p-2 text-xs outline-none">
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-600 mb-1">% Comisión</label>
+            <input type="number" step="0.1" id="editSCommRate" required class="w-full border rounded-lg p-2 text-xs outline-none">
+          </div>
+        </div>
+        <div class="flex justify-end gap-2 pt-2">
+          <button type="button" onclick="closeEditSellerModal()" class="px-3 py-2 bg-gray-200 text-gray-700 font-bold rounded-xl text-xs">Cancelar</button>
+          <button type="submit" class="px-4 py-2 bg-emerald-600 text-white font-bold rounded-xl text-xs hover:bg-emerald-700">Guardar Cambios</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div id="viewOrderModal" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 hidden flex justify-center items-center p-4">
+    <div class="bg-white w-full max-w-3xl max-h-[90vh] rounded-2xl shadow-xl flex flex-col overflow-hidden">
+      <div class="p-5 bg-slate-900 text-white flex justify-between items-center no-print">
+        <div>
+          <h2 class="text-base font-bold flex items-center gap-2">📄 Orden de Compra & Factura Digital</h2>
+          <p class="text-xs text-slate-400" id="orderModalSubtitle">Detalle de transacción</p>
+        </div>
+        <button onclick="closeOrderModal()" class="text-slate-400 hover:text-white text-xl">✕</button>
+      </div>
+
+      <div class="p-6 overflow-y-auto flex-1 bg-white" id="orderInvoicePrintArea">
+        <div class="flex justify-between items-start border-b pb-4 mb-4">
+          <div>
+            <h1 class="text-xl font-extrabold text-emerald-600">🥑 Avocado Shop Pro</h1>
+            <p class="text-[11px] text-gray-500">Insumos Profesionales de Uñas, Cejas y Pestañas</p>
+            <p class="text-[11px] text-gray-500">RIF: J-504930192 | WhatsApp: +58 414-3943252</p>
+          </div>
+          <div class="text-right">
+            <span id="invoiceOrderCode" class="text-base font-black text-slate-800 block">AVO-000000</span>
+            <span id="invoiceOrderDate" class="text-xs text-slate-400 block">00/00/0000</span>
+            <span id="invoiceOrderStatus" class="inline-block mt-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800">Pendiente</span>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-4 text-xs mb-6 bg-slate-50 p-3.5 rounded-xl">
+          <div>
+            <h4 class="font-bold text-slate-700 mb-1 border-b pb-1">Datos del Cliente</h4>
+            <p><strong>Nombre:</strong> <span id="invClientName">---</span></p>
+            <p><strong>C.I / RIF:</strong> <span id="invClientDoc">---</span></p>
+            <p><strong>Teléfono:</strong> <span id="invClientPhone">---</span></p>
+          </div>
+          <div>
+            <h4 class="font-bold text-slate-700 mb-1 border-b pb-1">Detalles de Entrega y Pago</h4>
+            <p><strong>Método Entrega:</strong> <span id="invDeliveryType">---</span></p>
+            <p><strong>Sucursal/Dirección:</strong> <span id="invBranch">---</span></p>
+            <p><strong>Ref. Pago Móvil:</strong> <span id="invRef">---</span></p>
+          </div>
+        </div>
+
+        <table class="w-full text-left text-xs mb-6 border-collapse">
+          <thead>
+            <tr class="bg-slate-100 text-slate-700 font-bold border-b">
+              <th class="p-2">Producto</th>
+              <th class="p-2 text-center">Cant.</th>
+              <th class="p-2 text-right">P. Unit ($)</th>
+              <th class="p-2 text-right">Subtotal ($)</th>
+            </tr>
+          </thead>
+          <tbody id="invoiceItemsTable" class="divide-y divide-slate-100"></tbody>
+        </table>
+
+        <div class="flex justify-end border-t pt-4">
+          <div class="w-64 space-y-1 text-xs">
+            <div class="flex justify-between text-slate-600">
+              <span>Subtotal Ref. ($):</span>
+              <span id="invSubtotal" class="font-bold">$0.00</span>
+            </div>
+            <div class="flex justify-between text-slate-600">
+              <span>Delivery ($):</span>
+              <span id="invDeliveryFee" class="font-bold">$0.00</span>
+            </div>
+            <div class="flex justify-between text-slate-900 font-black text-sm pt-2 border-t">
+              <span>TOTAL USD:</span>
+              <span id="invTotalUsd" class="text-emerald-600">$0.00</span>
+            </div>
+            <div class="flex justify-between text-slate-700 font-bold text-xs pt-1">
+              <span>TOTAL BS (BCV):</span>
+              <span id="invTotalBs" class="text-slate-800">Bs. 0,00</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="p-4 bg-slate-100 border-t flex flex-wrap justify-between items-center gap-2 no-print">
+        <div class="flex gap-2">
+          <label class="text-xs font-semibold text-slate-600 flex items-center gap-1">
+            Cambiar Estado:
+            <select id="updateOrderStatusSelect" onchange="updateSelectedOrderStatus(this)" class="bg-white border rounded-lg px-2 py-1 text-xs font-bold text-slate-800 outline-none">
+              <option value="En Verificación">En Verificación</option>
+              <option value="Procesando">Procesando</option>
+              <option value="Enviado / Listo">Enviado / Listo</option>
+              <option value="Entregado">Entregado</option>
+              <option value="Cancelado">Cancelado</option>
+            </select>
+          </label>
+        </div>
+
+        <div class="flex gap-2">
+          <button onclick="window.print()" class="bg-slate-800 text-white hover:bg-slate-900 px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1">
+            🖨️ Imprimir
+          </button>
+          <button onclick="downloadOrderPDF()" class="bg-emerald-600 text-white hover:bg-emerald-700 px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1">
+            📄 Descargar PDF
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="cartDrawer" class="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 hidden flex justify-end">
+    <div class="bg-white w-full max-w-md h-full shadow-2xl flex flex-col justify-between p-6 overflow-y-auto">
+      <div>
+        <div class="flex items-center justify-between pb-4 border-b">
+          <h2 class="text-lg font-bold text-slate-800">🛒 Tu Carrito de Compras</h2>
+          <button onclick="closeCart()" class="text-slate-400 hover:text-slate-600 font-bold text-xl">✕</button>
+        </div>
+        
+        <div id="cartItemsContainer" class="divide-y divide-gray-100 my-4"></div>
+      </div>
+
+      <div class="border-t pt-4 space-y-4">
+        <div class="space-y-1">
+          <div class="flex justify-between text-xs text-slate-500">
+            <span>Subtotal:</span>
+            <span id="cartSubtotalUsd" class="font-bold text-slate-700">$0.00</span>
+          </div>
+          <div class="flex justify-between text-sm font-black text-slate-900">
+            <span>Total USD:</span>
+            <span id="cartTotalUsd" class="text-emerald-600">$0.00</span>
+          </div>
+          <div class="flex justify-between text-xs font-bold text-slate-600">
+            <span>Total BS:</span>
+            <span id="cartTotalBs">Bs. 0,00</span>
+          </div>
+        </div>
+
+        <form id="checkoutForm" onsubmit="handleCheckout(event)" class="space-y-3 pt-2">
+          <div>
+            <label class="block text-[11px] font-bold text-slate-600 mb-1">Nombre Completo *</label>
+            <input type="text" id="cName" required class="w-full border rounded-lg p-2 text-xs outline-none focus:ring-1 focus:ring-emerald-500">
+          </div>
+          <div class="grid grid-cols-2 gap-2">
+            <div>
+              <label class="block text-[11px] font-bold text-slate-600 mb-1">C.I / RIF *</label>
+              <input type="text" id="cDoc" required placeholder="V-12345678" class="w-full border rounded-lg p-2 text-xs outline-none">
+            </div>
+            <div>
+              <label class="block text-[11px] font-bold text-slate-600 mb-1">Teléfono *</label>
+              <input type="tel" id="cPhone" required placeholder="04141234567" class="w-full border rounded-lg p-2 text-xs outline-none">
+            </div>
+          </div>
+          
+          <div>
+            <label class="block text-[11px] font-bold text-slate-600 mb-1">Método de Entrega *</label>
+            <select id="cDelivery" onchange="toggleDeliveryFields()" class="w-full border rounded-lg p-2 text-xs outline-none font-medium">
+              <option value="pickup">Retiro en Tienda (Gratis)</option>
+              <option value="delivery">Delivery ($3.00 Adicional)</option>
+            </select>
+          </div>
+
+          <div id="branchSelectContainer">
+            <label class="block text-[11px] font-bold text-slate-600 mb-1">Seleccionar Sucursal *</label>
+            <select id="cBranch" class="w-full border rounded-lg p-2 text-xs outline-none font-medium">
+              <option value="San Félix">San Félix</option>
+              <option value="CC Alta Vista I">CC Alta Vista I</option>
+              <option value="CC Alta Vista II">CC Alta Vista II</option>
+            </select>
+          </div>
+
+          <div id="addressContainer" class="hidden">
+            <label class="block text-[11px] font-bold text-slate-600 mb-1">Dirección de Envío Exacta *</label>
+            <textarea id="cAddress" rows="2" class="w-full border rounded-lg p-2 text-xs outline-none" placeholder="Indica sector, calle, punto de referencia..."></textarea>
+          </div>
+
+          <div>
+            <label class="block text-[11px] font-bold text-slate-600 mb-1">Número de Referencia (Pago Móvil) *</label>
+            <input type="text" id="cRef" required placeholder="Ej: 984012" class="w-full border rounded-lg p-2 text-xs outline-none">
+          </div>
+
+          <button type="submit" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 rounded-xl transition text-xs shadow-md">
+            🚀 Confirmar Pedido y Enviar WhatsApp
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <div id="inventoryScreenModal" class="fixed inset-0 bg-white z-50 hidden flex flex-col">
+    <div class="p-4 bg-slate-900 text-white flex justify-between items-center border-b border-slate-800">
+      <div>
+        <h2 class="text-base font-bold flex items-center gap-2">🖥️ Control de Inventario Global</h2>
+        <p class="text-xs text-slate-400">Vista optimizada para monitoreo continuo de existencias</p>
+      </div>
+      <button onclick="closeInventoryScreen()" class="text-slate-400 hover:text-white text-xl">✕</button>
+    </div>
+    
+    <div class="p-6 flex-1 overflow-y-auto">
+      <div class="max-w-7xl mx-auto space-y-4">
+        <div class="flex justify-between items-center">
+          <input type="text" id="invScreenSearch" oninput="renderInventoryScreen()" placeholder="Filtrar por SKU o nombre..." class="border rounded-xl px-4 py-2 text-xs w-64 outline-none focus:ring-2 focus:ring-emerald-500">
+          <button onclick="printInventoryReport()" class="bg-emerald-600 text-white px-4 py-2 rounded-xl text-xs font-bold hover:bg-emerald-700 transition">
+            🖨️ Exportar PDF / Imprimir Reporte
+          </button>
+        </div>
+
+        <div class="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
+          <table class="w-full text-left text-xs">
+            <thead class="bg-slate-100 text-slate-700 font-bold">
+              <tr>
+                <th class="p-3">SKU</th>
+                <th class="p-3">Producto</th>
+                <th class="p-3">Categoría</th>
+                <th class="p-3">Sucursal</th>
+                <th class="p-3">Precio ($)</th>
+                <th class="p-3">Stock</th>
+                <th class="p-3">Estado</th>
+              </tr>
+            </thead>
+            <tbody id="inventoryScreenTableBody" class="divide-y divide-slate-100"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="appointmentsScreenModal" class="fixed inset-0 bg-white z-50 hidden flex flex-col">
+    <div class="p-4 bg-slate-900 text-white flex justify-between items-center border-b border-slate-800">
+      <div>
+        <h2 class="text-base font-bold flex items-center gap-2">🗓️ Pantalla General de Citas Agendadas</h2>
+        <p class="text-xs text-slate-400">Vista ampliada para recepción y gestión de agenda en tiempo real</p>
+      </div>
+      <button onclick="closeAppointmentsScreen()" class="text-slate-400 hover:text-white text-xl font-bold">✕ Cerrar Pantalla</button>
+    </div>
+    
+    <div class="p-6 flex-1 overflow-y-auto bg-slate-50">
+      <div class="max-w-7xl mx-auto space-y-4">
+        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+          <input type="text" id="appScreenSearch" oninput="renderAppointmentsScreen()" placeholder="Buscar por cliente, código o teléfono..." class="border bg-white rounded-xl px-4 py-2 text-xs w-72 outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm">
+          
+          <div class="flex items-center gap-2">
+            <span class="text-xs font-semibold text-slate-600">Filtrar Sucursal:</span>
+            <select id="appScreenBranchFilter" onchange="renderAppointmentsScreen()" class="bg-white border rounded-xl px-3 py-2 text-xs font-bold text-slate-800 outline-none shadow-sm">
+              <option value="ALL">Todas las Sucursales</option>
+              <option value="San Félix">San Félix</option>
+              <option value="CC Alta Vista I">CC Alta Vista I</option>
+              <option value="CC Alta Vista II">CC Alta Vista II</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
+          <table class="w-full text-left text-xs">
+            <thead class="bg-slate-100 text-slate-700 font-bold border-b">
+              <tr>
+                <th class="p-3">Código</th>
+                <th class="p-3">Cliente</th>
+                <th class="p-3">Servicio</th>
+                <th class="p-3">Sucursal / Especialista</th>
+                <th class="p-3">Fecha y Hora</th>
+                <th class="p-3">Estado</th>
+                <th class="p-3 text-center">Acciones</th>
+              </tr>
+            </thead>
+            <tbody id="appointmentsScreenTableBody" class="divide-y divide-slate-100"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
 </body>
 </html>
