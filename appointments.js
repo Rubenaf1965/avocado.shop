@@ -1,3 +1,8 @@
+
+const manicureServices = [
+    { id: 'manicure', name: 'Manicure', duration: '2 horas' },
+    { id: 'pedicure', name: 'Pedicure', duration: '1 hora 40 minutos' }
+];
 // Procesar la reserva desde el formulario web
 window.handleCreateAppointment = (e) => {
   e.preventDefault();
