@@ -88,7 +88,7 @@ window.handleCreateAppointment = async (e) => {
 
   // Recargar las citas desde Supabase para actualizar la tabla inmediatamente
   await loadAppointmentsFromSupabase();
-  
+
   // Guardar en Supabase y base de datos local
   if (typeof guardarCita === 'function') {
     await guardarCita({
@@ -125,13 +125,20 @@ window.handleCreateAppointment = async (e) => {
   alert(`✅ Tu solicitud de cita #${appointmentId} ha sido enviada con éxito.`);
 };
 
-/// --- CARGAR CITAS DESDE SUPABASE AL PANEL ---
-async function loadAppointmentsFromSupabase() {
-  // Buscamos el cliente activo (puede ser window.supabaseClient o window.supabase si ya es la instancia)
-  const client = window.supabaseClient || (typeof supabase !== 'undefined' && typeof supabase.from === 'function' ? supabase : null);
+// --- CARGAR CITAS DESDE SUPABASE AL PANEL (CON REINTENTO) ---
+async function loadAppointmentsFromSupabase(retries = 5) {
+  // Busca cualquier variante global del cliente de Supabase
+  const client = window.supabaseClient || 
+                 (typeof supabase !== 'undefined' && typeof supabase.from === 'function' ? supabase : null) ||
+                 window._supabase;
   
   if (!client) {
-    console.warn('Cliente de Supabase no disponible aún.');
+    if (retries > 0) {
+      // Si aún no carga, espera 300ms y vuelve a intentar
+      setTimeout(() => loadAppointmentsFromSupabase(retries - 1), 300);
+    } else {
+      console.warn('Cliente de Supabase no disponible tras varios intentos.');
+    }
     return;
   }
   
