@@ -38,7 +38,7 @@ function getSupabaseClient() {
 
 // --- PROCESAR LA RESERVA DESDE EL FORMULARIO WEB ---
 window.handleCreateAppointment = async (e) => {
-    e.preventDefault();
+    if (e && e.preventDefault) e.preventDefault();
 
     const clientName = document.getElementById('appClientName')?.value.trim();
     const clientPhone = document.getElementById('appClientPhone')?.value.trim();
@@ -56,7 +56,7 @@ window.handleCreateAppointment = async (e) => {
 
     let service = manicureServices.find(s => s.id === serviceId || s.name === serviceId);
     if (!service && serviceSelectElement) {
-        const selectedText = serviceSelectElement.options[serviceSelectElement.selectedIndex].text;
+        const selectedText = serviceSelectElement.options[serviceSelectElement.selectedIndex]?.text || '';
         service = {
             id: serviceId,
             name: selectedText.split('(')[0].trim() || serviceId,
@@ -66,9 +66,11 @@ window.handleCreateAppointment = async (e) => {
 
     const staff = staffMembers.find(s => s.id === staffId);
     const appointmentId = 'AVO-CIT-' + Math.floor(100000 + Math.random() * 900000);
-    const currentBcv = window.bcvRate || 36.50;
-    const totalBs = (service.price * currentBcv).toFixed(2);
+    const currentBcv = window.bcvRate || 832.49;
+    const totalBs = (service ? (service.price * currentBcv).toFixed(2) : '0.00');
     const staffNameFinal = staff ? staff.name : 'Asignación Automática';
+    const serviceNameFinal = service ? service.name : 'Servicio General';
+    const priceFinal = service ? service.price.toFixed(2) : '0.00';
 
     try {
         const client = getSupabaseClient();
@@ -77,7 +79,7 @@ window.handleCreateAppointment = async (e) => {
                 codigo: appointmentId,
                 cliente: clientName,
                 telefono: clientPhone,
-                servicio: service.name,
+                servicio: serviceNameFinal,
                 sucursal_especialista: `${branch} (${staffNameFinal})`,
                 fecha_hora: `${date} - ${time}`,
                 estado: 'Pendiente'
@@ -93,18 +95,18 @@ window.handleCreateAppointment = async (e) => {
     let msg = `✨ *SOLICITUD DE CITA - AVOCADO SPA* ✨\n\n`;
     msg += `🆔 *Cita:* #${appointmentId}\n`;
     msg += `👤 *Cliente:* ${clientName}\n`;
-    msg += `💅 *Servicio:* ${service.name}\n`;
+    msg += `💅 *Servicio:* ${serviceNameFinal}\n`;
     msg += `🏢 *Sucursal:* ${branch}\n`;
     msg += `👩‍🎨 *Especialista:* ${staffNameFinal}\n`;
     msg += `📅 *Fecha:* ${date}\n`;
     msg += `⏰ *Hora:* ${time}\n`;
-    msg += `💰 *Total:* $${service.price.toFixed(2)} (Bs. ${totalBs})\n\n`;
+    msg += `💰 *Total:* $${priceFinal} (Bs. ${totalBs})\n\n`;
     msg += `_Quedo a la espera de la confirmación de la cita._`;
 
     window.open(`https://wa.me/584143943252?text=${encodeURIComponent(msg)}`, '_blank');
 
-    const formEl = document.getElementById('appointmentForm');
-    if (formEl) formEl.reset();
+    const formEl = document.getElementById('appointmentForm') || document.getElementById('appForm') || document.querySelector('form');
+    if (formEl && typeof formEl.reset === 'function') formEl.reset();
     alert(`✅ Tu solicitud de cita #${appointmentId} ha sido enviada con éxito.`);
 };
 
@@ -193,7 +195,7 @@ window.deleteAppointment = async (appointmentId) => {
     await loadAppointmentsFromSupabase();
 };
 
-// RENDERIZAR TABLA ADMIN PRINCIPAL
+// RENDERIZAR TABLA ADMIN PRINCIPAL / VISTA PREVIA
 function renderAppointmentsTableSafe() {
     const tbody = document.getElementById('appointmentsTableBody');
     if (!tbody) return;
@@ -284,6 +286,21 @@ window.renderAppointmentsScreen = () => {
     `).join('');
 };
 
+// ENLAZAR EVENT LISTENER AL FORMULARIO
+function attachFormListener() {
+    const form = document.getElementById('appointmentForm') || document.getElementById('appForm') || document.querySelector('form');
+    if (form) {
+        form.removeEventListener('submit', window.handleCreateAppointment);
+        form.addEventListener('submit', window.handleCreateAppointment);
+    }
+}
+
 // INICIALIZACIÓN
-window.addEventListener('DOMContentLoaded', loadAppointmentsFromSupabase);
-window.addEventListener('load', loadAppointmentsFromSupabase);
+window.addEventListener('DOMContentLoaded', () => {
+    loadAppointmentsFromSupabase();
+    attachFormListener();
+});
+window.addEventListener('load', () => {
+    loadAppointmentsFromSupabase();
+    attachFormListener();
+});
