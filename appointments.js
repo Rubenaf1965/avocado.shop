@@ -215,75 +215,100 @@ function renderAppointmentsTableSafe() {
 window.addEventListener('DOMContentLoaded', loadAppointmentsFromSupabase);
 window.addEventListener('load', loadAppointmentsFromSupabase);
 
-/// --- FUNCION DE RENDERO Y EXPORTACION DE REPORTES ---
+// --- FUNCIONES DE REPORTES EN PANTALLA E IMPRESIÓN ---
 
 window.displayAppointmentsScreen = async function() {
   const modal = document.getElementById('screenAppointmentsModal');
-  const tableContainer = document.getElementById('screenAppointmentsTableBody');
-  const totalCounter = document.getElementById('screenAppointmentsTotal');
-  const dateElement = document.getElementById('screenAppointmentsDate');
+  const tableContainer = document.getElementById('screenAppointmentsBody'); // ID real del HTML
+  const totalCounter = document.getElementById('appReportTotalCount');     // ID real del HTML
+  const dateElement = document.getElementById('appReportDate');            // ID real del HTML
 
   // 1. Asignar fecha actual
   if (dateElement) {
     dateElement.textContent = new Date().toLocaleDateString('es-ES');
   }
 
-  // 2. Mostrar spinner/mensaje de carga
+  // 2. Estado de carga en la tabla
   if (tableContainer) {
-    tableContainer.innerHTML = `<tr><td colspan="8" class="text-center py-4 text-gray-500">Cargando citas...</td></tr>`;
+    tableContainer.innerHTML = `<tr><td colspan="8" class="text-center py-4 text-slate-400 text-xs">Cargando citas desde Supabase...</td></tr>`;
   }
 
-  // 3. Abrir el modal inmediatamente
+  // 3. Desplegar el modal
   if (modal) modal.classList.remove('hidden');
 
-  // 4. Obtener las citas actualizadas directamente de Supabase
   let appointmentsList = [];
+
+  // 4. Consultar datos a Supabase
   try {
     const supabase = getSupabaseClient();
     if (supabase) {
       const { data, error } = await supabase
         .from('appointments')
-        .select('*')
-        .order('created_at', { ascending: false });
+        .select('*');
 
-      if (!error && data) {
+      if (!error && data && data.length > 0) {
         appointmentsList = data;
-        window.appointments = data; // Sincroniza la variable global
       }
     }
   } catch (err) {
-    console.error('Error cargando citas para el reporte:', err);
+    console.error('Error recuperando citas para reporte:', err);
   }
 
-  // Si no obtuvo datos de la base de datos, usa el fallback en memoria
-  if (appointmentsList.length === 0 && window.appointments) {
+  // Fallback si la consulta web devolvió array vacío pero hay datos locales
+  if (appointmentsList.length === 0 && Array.isArray(window.appointments) && window.appointments.length > 0) {
     appointmentsList = window.appointments;
   }
 
-  // 5. Renderizar los datos devueltos
+  // 5. Inyectar filas con Mapeo Correcto a tu esquema de Supabase
   if (tableContainer) {
     if (appointmentsList.length === 0) {
-      tableContainer.innerHTML = `<tr><td colspan="8" class="text-center py-4 text-gray-500">No hay citas registradas.</td></tr>`;
+      tableContainer.innerHTML = `<tr><td colspan="8" class="text-center py-4 text-slate-400 text-xs">No hay citas registradas en el sistema.</td></tr>`;
     } else {
-      tableContainer.innerHTML = appointmentsList.map(item => `
-        <tr class="border-b text-sm text-gray-700">
-          <td class="py-2 px-3 font-semibold">${item.appointment_code || item.code || 'AVO-CIT'}</td>
-          <td class="py-2 px-3">${item.client_name || item.clientName || 'N/A'}</td>
-          <td class="py-2 px-3">${item.client_phone || item.clientPhone || 'N/A'}</td>
-          <td class="py-2 px-3">${item.service_name || item.service || 'N/A'}</td>
-          <td class="py-2 px-3">${item.specialist || 'Asignación Automática'}</td>
-          <td class="py-2 px-3">${item.branch || 'San Félix'}</td>
-          <td class="py-2 px-3">${item.appointment_date || item.created_at ? new Date(item.appointment_date || item.created_at).toLocaleString('es-ES') : 'N/A'}</td>
-          <td class="py-2 px-3"><span class="bg-yellow-100 text-yellow-800 text-xs px-2 py-1 rounded font-medium">${item.status || 'En Verificación'}</span></td>
-        </tr>
-      `).join('');
+      tableContainer.innerHTML = appointmentsList.map(item => {
+        // Mapeo seguro para soportar campos en español (DB) y formato procesado (JS)
+        const code = item.codigo || item.appointmentId || item.code || 'AVO-CIT';
+        const client = item.cliente || item.clientName || 'N/A';
+        const phone = item.telefono || item.clientPhone || 'N/A';
+        const service = item.servicio || item.serviceName || 'N/A';
+        const staffAndBranch = item.sucursal_especialista || item.staffName || 'San Félix';
+        const dateTime = item.fecha_hora || item.dateTime || 'N/A';
+        const status = item.estado || item.status || 'Pendiente';
+
+        return `
+          <tr class="border-b text-xs text-slate-700 hover:bg-slate-50 transition">
+            <td class="p-2.5 font-bold">${code}</td>
+            <td class="p-2.5">${client}</td>
+            <td class="p-2.5">${phone}</td>
+            <td class="p-2.5">${service}</td>
+            <td class="p-2.5">${staffAndBranch}</td>
+            <td class="p-2.5">${staffAndBranch.split('(')[0].trim()}</td>
+            <td class="p-2.5">${dateTime}</td>
+            <td class="p-2.5 text-center">
+              <span class="px-2 py-1 rounded-full text-[10px] font-bold ${
+                status === 'Verificado' || status === 'Confirmada' ? 'bg-emerald-100 text-emerald-800' :
+                status === 'En Verificación' || status === 'Pendiente' ? 'bg-amber-100 text-amber-800' :
+                'bg-red-100 text-red-800'
+              }">${status}</span>
+            </td>
+          </tr>
+        `;
+      }).join('');
     }
   }
 
-  // 6. Actualizar contador total
+  // 6. Actualizar contador global
   if (totalCounter) {
-    totalCounter.textContent = appointmentsList.length;
+    totalCounter.textContent = `Total Citas: ${appointmentsList.length}`;
   }
+};
+
+window.closeAppointmentsScreen = function() {
+  const modal = document.getElementById('screenAppointmentsModal');
+  if (modal) modal.classList.add('hidden');
+};
+
+window.printAppointmentsReport = function() {
+  window.print();
 };
 
 window.printAppointmentsReport = function() {
