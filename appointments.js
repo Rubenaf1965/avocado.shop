@@ -214,11 +214,60 @@ function renderAppointmentsTableSafe() {
 // Inicializar al cargar la página
 window.addEventListener('DOMContentLoaded', loadAppointmentsFromSupabase);
 window.addEventListener('load', loadAppointmentsFromSupabase);
-// Exponer funciones de modal y reporte al scope global
+/// --- FUNCION DE RENDERO Y EXPORTACION DE REPORTES ---
+
 window.displayAppointmentsScreen = function() {
   const modal = document.getElementById('screenAppointmentsModal');
+  const tableContainer = document.getElementById('screenAppointmentsTableBody'); // Ajusta este ID según tu HTML
+  const totalCounter = document.getElementById('screenAppointmentsTotal'); // Ajusta este ID según tu HTML
+  const dateElement = document.getElementById('screenAppointmentsDate');
+
+  // 1. Asignar fecha actual al reporte
+  if (dateElement) {
+    const today = new Date();
+    dateElement.textContent = today.toLocaleDateString('es-ES');
+  }
+
+  // 2. Obtener la lista actual de citas (global o local)
+  const appointmentsList = window.appointments || [];
+
+  // 3. Renderizar las filas de la tabla si existen citas
+  if (tableContainer) {
+    if (appointmentsList.length === 0) {
+      tableContainer.innerHTML = `<tr><td colspan="8" class="text-center py-4 text-gray-500">No hay citas registradas.</td></tr>`;
+    } else {
+      tableContainer.innerHTML = appointmentsList.map(item => `
+        <tr class="border-b text-sm">
+          <td class="py-2 px-3 font-semibold">${item.code || 'AVO-CIT'}</td>
+          <td class="py-2 px-3">${item.client_name || item.clientName || 'N/A'}</td>
+          <td class="py-2 px-3">${item.client_phone || item.clientPhone || 'N/A'}</td>
+          <td class="py-2 px-3">${item.service_name || item.service || 'N/A'}</td>
+          <td class="py-2 px-3">${item.specialist || 'Asignación Automática'}</td>
+          <td class="py-2 px-3">${item.branch || 'San Félix'}</td>
+          <td class="py-2 px-3">${item.created_at ? new Date(item.created_at).toLocaleString() : 'N/A'}</td>
+          <td class="py-2 px-3"><span class="bg-yellow-100 text-yellow-800 text-xs px-2 py-1 rounded">${item.status || 'En Verificación'}</span></td>
+        </tr>
+      `).join('');
+    }
+  }
+
+  // 4. Actualizar contador total
+  if (totalCounter) {
+    totalCounter.textContent = appointmentsList.length;
+  }
+
+  // 5. Mostrar el modal
   if (modal) modal.classList.remove('hidden');
-  if (typeof renderScreenAppointments === 'function') renderScreenAppointments();
+};
+
+window.printAppointmentsReport = function() {
+  // Asegura que la tabla se haya poblado antes de mandar a imprimir
+  window.displayAppointmentsScreen();
+
+  // Esperar un render para ejecutar la impresión limpia
+  setTimeout(() => {
+    window.print();
+  }, 300);
 };
 
 window.closeAppointmentsScreen = function() {

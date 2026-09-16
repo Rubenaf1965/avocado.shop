@@ -20,12 +20,30 @@
     body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: #FAFAFA; }
     .tab-btn.active { background-color: #059669; color: white; }
 
-    @media print {
-      body * { visibility: hidden; }
-      #printableArea, #printableArea *, #orderInvoicePrintArea, #orderInvoicePrintArea *, #appointmentsPrintArea, #appointmentsPrintArea * { visibility: visible; }
-      #orderInvoicePrintArea, #printableArea, #appointmentsPrintArea { position: absolute; left: 0; top: 0; width: 100%; }
-      .no-print { display: none !important; }
-    }
+   @media print {
+  /* Ocultar todo el dashboard administrativo de fondo */
+  body * {
+    visibility: hidden;
+  }
+
+  /* Mostrar únicamente el modal de reporte de citas */
+  #screenAppointmentsModal, #screenAppointmentsModal * {
+    visibility: visible;
+  }
+
+  #screenAppointmentsModal {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    background: white !important;
+  }
+
+  /* Ocultar botones de cierre/imprimir dentro del documento impreso */
+  .no-print {
+    display: none !important;
+  }
+}
   </style>
 </head>
 <body class="text-gray-800">
