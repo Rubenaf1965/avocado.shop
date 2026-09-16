@@ -62,7 +62,33 @@ window.handleCreateAppointment = async (e) => {
     status: 'Pendiente',
     createdAt: new Date().toISOString()
   };
+// Guardar en Supabase si está disponible la función o el cliente
+  const client = window.supabaseClient || (typeof supabase !== 'undefined' && typeof supabase.from === 'function' ? supabase : null);
+  
+  if (typeof guardarCita === 'function') {
+    await guardarCita({
+      codigo: appointmentId,
+      cliente: clientName,
+      telefono: clientPhone,
+      servicio: service.name,
+      sucursalEspecialista: `${branch} (${newAppointment.staffName})`,
+      fechaHora: `${date} - ${time}`
+    });
+  } else if (client) {
+    await client.from('appointments').insert([{
+      codigo: appointmentId,
+      cliente: clientName,
+      telefono: clientPhone,
+      servicio: service.name,
+      sucursal_especialista: `${branch} (${newAppointment.staffName})`,
+      fecha_hora: `${date} - ${time}`,
+      estado: 'Pendiente'
+    }]);
+  }
 
+  // Recargar las citas desde Supabase para actualizar la tabla inmediatamente
+  await loadAppointmentsFromSupabase();
+  
   // Guardar en Supabase y base de datos local
   if (typeof guardarCita === 'function') {
     await guardarCita({
@@ -99,11 +125,17 @@ window.handleCreateAppointment = async (e) => {
   alert(`✅ Tu solicitud de cita #${appointmentId} ha sido enviada con éxito.`);
 };
 
-// --- CARGAR CITAS DESDE SUPABASE AL PANEL ---
+/// --- CARGAR CITAS DESDE SUPABASE AL PANEL ---
 async function loadAppointmentsFromSupabase() {
-  if (typeof supabase === 'undefined') return;
+  // Buscamos el cliente activo (puede ser window.supabaseClient o window.supabase si ya es la instancia)
+  const client = window.supabaseClient || (typeof supabase !== 'undefined' && typeof supabase.from === 'function' ? supabase : null);
   
-  const { data, error } = await supabase
+  if (!client) {
+    console.warn('Cliente de Supabase no disponible aún.');
+    return;
+  }
+  
+  const { data, error } = await client
     .from('appointments')
     .select('*');
 
