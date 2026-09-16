@@ -13,14 +13,16 @@ const manicureServices = [
 // Arreglo global de citas
 window.appointments = window.appointments || [];
 
-// Función auxiliar segura para obtener el cliente de Supabase
+// Función auxiliar segura para obtener el cliente de Supabase (Corregida y Blindada)
 function getSupabaseClient() {
-    if (window.supabaseClient && typeof window.supabaseClient.from === 'function') {
-        return window.supabaseClient;
-    }
-    // Si window.supabase es una instancia directa con .from
-    if (window.supabase && typeof window.supabase.from === 'function') {
-        return window.supabase;
+    const s = window.supabaseClient || window.supabase || window._supabase;
+    if (!s) return null;
+    
+    // Si viene envuelto en una propiedad default (típico de algunos imports de ES Modules)
+    const client = s.default && typeof s.default.from === 'function' ? s.default : s;
+    
+    if (client && typeof client.from === 'function') {
+        return client;
     }
     return null;
 }
@@ -110,7 +112,7 @@ async function loadAppointmentsFromSupabase() {
     const client = getSupabaseClient();
     
     if (!client) {
-        setTimeout(loadAppointmentsFromSupabase, 500);
+        setTimeout(loadAppointmentsFromSupabase, 800);
         return;
     }
     
