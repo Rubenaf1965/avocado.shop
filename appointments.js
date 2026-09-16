@@ -12,15 +12,32 @@ const manicureServices = [
 
 window.appointments = window.appointments || [];
 
-// Función auxiliar segura para obtener el cliente de Supabase
+// Variable global para almacenar el cliente de Supabase una vez inicializado de forma segura
+let cachedSupabaseClient = null;
 
+// Función auxiliar robusta para obtener el cliente de Supabase
 function getSupabaseClient() {
-    // Apuntamos directamente a window.supabase que es el objeto válido detectado
+    if (cachedSupabaseClient) return cachedSupabaseClient;
+
     const s = window.supabase;
     if (!s) return null;
+
+    // Si existe createClient en la librería global, intentamos inicializarlo si hay credenciales globales o del sistema
+    if (typeof s.createClient === 'function' && window.SUPABASE_URL && window.SUPABASE_ANON_KEY) {
+        cachedSupabaseClient = s.createClient(window.SUPABASE_URL, window.SUPABASE_ANON_KEY);
+        return cachedSupabaseClient;
+    }
+
+    // Compatibilidad con la estructura previa detectada en tu entorno
     const client = s.default && typeof s.default.from === 'function' ? s.default : s;
-    return (client && typeof client.from === 'function') ? client : null;
+    if (client && typeof client.from === 'function') {
+        cachedSupabaseClient = client;
+        return cachedSupabaseClient;
+    }
+
+    return null;
 }
+
 // --- PROCESAR LA RESERVA DESDE EL FORMULARIO WEB ---
 window.handleCreateAppointment = async (e) => {
     e.preventDefault();
@@ -113,7 +130,7 @@ async function loadAppointmentsFromSupabase() {
 
     if (data && data.length > 0) {
         window.appointments = data.map(item => ({
-            id: item.id, // ID interno para operaciones de base de datos
+            id: item.id,
             appointmentId: item.codigo || item.code || 'N/A',
             clientName: item.cliente || item.client_name || 'Sin nombre',
             clientPhone: item.telefono || item.client_phone || '',
