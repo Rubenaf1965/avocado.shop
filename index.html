@@ -22,9 +22,8 @@
 
     @media print {
       body * { visibility: hidden; }
-      #printableArea, #printableArea *, #orderInvoicePrintArea, #orderInvoicePrintArea * { visibility: visible; }
-      #orderInvoicePrintArea { position: absolute; left: 0; top: 0; width: 100%; }
-      #printableArea { position: absolute; left: 0; top: 0; width: 100%; }
+      #printableArea, #printableArea *, #orderInvoicePrintArea, #orderInvoicePrintArea *, #appointmentsPrintArea, #appointmentsPrintArea * { visibility: visible; }
+      #orderInvoicePrintArea, #printableArea, #appointmentsPrintArea { position: absolute; left: 0; top: 0; width: 100%; }
       .no-print { display: none !important; }
     }
   </style>
@@ -332,10 +331,18 @@
         <div class="lg:col-span-2 space-y-6">
           <!-- MÓDULO ADMINISTRATIVO DE AGENDA -->
           <div class="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm">
-            <div class="flex items-center justify-between mb-4">
+            <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-4">
               <div>
                 <h3 class="font-bold text-slate-800 text-base">🗓️ Agenda del Centro de Manicura</h3>
                 <p class="text-xs text-slate-400">Control de citas, estado del servicio y envío de recordatorios automáticos.</p>
+              </div>
+              <div class="flex items-center gap-2">
+                <button onclick="displayAppointmentsScreen()" class="bg-slate-800 text-white px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-black transition flex items-center gap-1.5">
+                  🖥️ Ver en Pantalla
+                </button>
+                <button onclick="printAppointmentsReport()" class="bg-emerald-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-emerald-700 transition flex items-center gap-1.5">
+                  🖨️ Imprimir Citas
+                </button>
               </div>
             </div>
 
@@ -668,6 +675,56 @@
     </div>
   </div>
 
+  <!-- MODAL REPORTE EN PANTALLA PARA CITAS AGENDADAS -->
+  <div id="screenAppointmentsModal" class="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 hidden flex justify-center items-center p-4">
+    <div class="bg-white w-full max-w-4xl max-h-[90vh] rounded-2xl shadow-xl flex flex-col overflow-hidden">
+      <div class="p-5 bg-slate-900 text-white flex justify-between items-center no-print">
+        <div>
+          <h2 class="text-lg font-bold">🗓️ Reporte General de Citas</h2>
+          <p class="text-xs text-slate-400" id="appointmentsBranchSubtitle">Vista de agenda en pantalla</p>
+        </div>
+        <button onclick="closeAppointmentsScreen()" class="text-slate-400 hover:text-white text-xl">✕</button>
+      </div>
+
+      <div id="appointmentsPrintArea" class="p-6 overflow-y-auto flex-1">
+        <div class="flex justify-between items-center border-b pb-4 mb-4">
+          <div>
+            <h1 class="text-xl font-bold text-emerald-600">🥑 Avocado Spa & Nails</h1>
+            <p class="text-xs text-gray-500">Control General de Citas de Manicura</p>
+          </div>
+          <div class="text-right text-xs text-gray-500">
+            <p><strong>Fecha Reporte:</strong> <span id="appReportDate">--/--/----</span></p>
+          </div>
+        </div>
+
+        <table class="w-full text-left text-xs mb-6 border-collapse">
+          <thead class="bg-slate-100 text-slate-700 font-bold border-b">
+            <tr>
+              <th class="p-2">Código</th>
+              <th class="p-2">Cliente</th>
+              <th class="p-2">Teléfono</th>
+              <th class="p-2">Servicio</th>
+              <th class="p-2">Especialista</th>
+              <th class="p-2">Sucursal</th>
+              <th class="p-2">Fecha y Hora</th>
+              <th class="p-2 text-center">Estado</th>
+            </tr>
+          </thead>
+          <tbody id="screenAppointmentsBody" class="divide-y border-b"></tbody>
+        </table>
+
+        <div class="flex justify-between text-xs font-bold text-slate-700 bg-slate-50 p-3 rounded-xl">
+          <span id="appReportTotalCount">Total Citas: 0</span>
+        </div>
+      </div>
+
+      <div class="p-4 bg-slate-50 border-t flex justify-end gap-3 no-print">
+        <button onclick="closeAppointmentsScreen()" class="px-4 py-2 bg-gray-200 text-gray-700 font-bold rounded-xl text-xs hover:bg-gray-300">Cerrar</button>
+        <button onclick="printAppointmentsReport()" class="px-4 py-2 bg-emerald-600 text-white font-bold rounded-xl text-xs hover:bg-emerald-700">Imprimir / PDF</button>
+      </div>
+    </div>
+  </div>
+
   <div id="cartModal" class="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 hidden flex justify-end">
     <div class="w-full max-w-md bg-white h-full p-6 flex flex-col justify-between overflow-y-auto">
       <div>
@@ -748,7 +805,7 @@
     </div>
   </div>
 
- <<!-- Vinculación de Módulos JavaScript Externos sincronizados -->
+  <!-- Vinculación de Módulos JavaScript Externos sincronizados -->
   <script type="module" src="./supabaseClient.js?v=20260915"></script>
   <script type="module" src="./app.js?v=20260915"></script>
   <script type="module" src="./appointments.js?v=20260915"></script>
