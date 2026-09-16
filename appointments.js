@@ -1,4 +1,4 @@
-// Agrega o verifica las constantes al inicio de appointments.js
+// --- CONSTANTES Y CONFIGURACIÓN DE CITAS ---
 const staffMembers = [
     { id: 'staff-1', name: 'Especialista San Félix', branch: 'san felix' },
     { id: 'staff-2', name: 'Especialista Alta Vista', branch: 'cc alta vista i' }
@@ -10,8 +10,11 @@ const manicureServices = [
     { id: 'Manicura Rusa + Gelificación', name: 'Manicura Rusa + Gelificación', price: 25.00, duration: '2 horas' }
 ];
 
-// Procesar la reserva desde el formulario web
-window.handleCreateAppointment = (e) => {
+// Arreglo global de citas
+window.appointments = window.appointments || [];
+
+// --- PROCESAR LA RESERVA DESDE EL FORMULARIO WEB ---
+window.handleCreateAppointment = async (e) => {
   e.preventDefault();
 
   const clientName = document.getElementById('appClientName').value.trim();
@@ -28,21 +31,20 @@ window.handleCreateAppointment = (e) => {
     return;
   }
 
-  // Búsqueda flexible: por ID exacto, por coincidencia en el texto o valor por defecto
+  // Búsqueda flexible del servicio
   let service = manicureServices.find(s => s.id === serviceId || s.name === serviceId);
   if (!service) {
-    // Intento de rescate si el select pasa el texto completo con precio
     const selectedText = serviceSelectElement.options[serviceSelectElement.selectedIndex].text;
     service = {
       id: serviceId,
       name: selectedText.split('(')[0].trim() || serviceId,
-      price: 25.00 // Precio por defecto de respaldo para evitar errores
+      price: 25.00 // Respaldo por defecto
     };
   }
 
   const staff = staffMembers.find(s => s.id === staffId);
   const appointmentId = 'AVO-CIT-' + Math.floor(1000 + Math.random() * 9000);
-  const currentBcv = window.bcvRate || 36.50; // Respaldo por si la tasa global tarda un instante
+  const currentBcv = window.bcvRate || 36.50;
   const totalBs = (service.price * currentBcv).toFixed(2);
 
   const newAppointment = {
@@ -61,15 +63,9 @@ window.handleCreateAppointment = (e) => {
     createdAt: new Date().toISOString()
   };
 
-  // Guardar en memoria local o arreglo global si existe
-  if (typeof appointments !== 'undefined') {
-    appointments.push(newAppointment);
-    if (typeof saveAppointmentsState === 'function') saveAppointmentsState();
-  }
-
-  // Guardar en Supabase si está disponible la función
+  // Guardar en Supabase y base de datos local
   if (typeof guardarCita === 'function') {
-    guardarCita({
+    await guardarCita({
       codigo: appointmentId,
       cliente: clientName,
       telefono: clientPhone,
@@ -78,6 +74,9 @@ window.handleCreateAppointment = (e) => {
       fechaHora: `${date} - ${time}`
     });
   }
+
+  // Recargar las citas desde Supabase para actualizar la tabla inmediatamente
+  await loadAppointmentsFromSupabase();
 
   // Crear mensaje directo para el WhatsApp de Avocado Shop
   let msg = `✨ *SOLICITUD DE CITA - AVOCADO SPA* ✨\n\n`;
@@ -94,12 +93,46 @@ window.handleCreateAppointment = (e) => {
   const encodedMsg = encodeURIComponent(msg);
   window.open(`https://wa.me/584143943252?text=${encodedMsg}`, '_blank');
 
-  // Intentar resetear formulario y refrescar tabla si los elementos existen
+  // Resetear formulario y avisar
   const formEl = document.getElementById('appointmentForm');
   if (formEl) formEl.reset();
   alert(`✅ Tu solicitud de cita #${appointmentId} ha sido enviada con éxito.`);
-  
-  if (typeof renderAppointmentsTable === 'function') {
-    renderAppointmentsTable();
-  }
 };
+
+// --- CARGAR CITAS DESDE SUPABASE AL PANEL ---
+async function loadAppointmentsFromSupabase() {
+  if (typeof supabase === 'undefined') return;
+  
+  const { data, error } = await supabase
+    .from('appointments')
+    .select('*');
+
+  if (error) {
+    console.error('Error al cargar citas de Supabase:', error.message);
+    return;
+  }
+
+  if (data) {
+    window.appointments = data.map(item => ({
+      appointmentId: item.codigo,
+      clientName: item.cliente,
+      clientPhone: item.telefono,
+      serviceName: item.servicio,
+      branch: item.sucursal_especialista ? item.sucursal_especialista.split('(')[0].trim() : 'San Félix',
+      staffName: item.sucursal_especialista || 'Asignación Automática',
+      date: item.fecha_hora ? item.fecha_hora.split('-')[0].trim() : '',
+      time: item.fecha_hora ? item.fecha_hora.split('-')[1]?.trim() : '',
+      status: item.estado || 'Pendiente',
+      price: 25.00
+    }));
+
+    if (typeof renderAppointmentsTable === 'function') {
+      renderAppointmentsTable();
+    }
+  }
+}
+
+// --- EJECUTAR AL CARGAR LA VENTANA ---
+window.addEventListener('DOMContentLoaded', () => {
+  loadAppointmentsFromSupabase();
+});
