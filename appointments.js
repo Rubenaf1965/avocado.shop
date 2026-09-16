@@ -214,50 +214,76 @@ function renderAppointmentsTableSafe() {
 // Inicializar al cargar la página
 window.addEventListener('DOMContentLoaded', loadAppointmentsFromSupabase);
 window.addEventListener('load', loadAppointmentsFromSupabase);
+
 /// --- FUNCION DE RENDERO Y EXPORTACION DE REPORTES ---
 
-window.displayAppointmentsScreen = function() {
+window.displayAppointmentsScreen = async function() {
   const modal = document.getElementById('screenAppointmentsModal');
-  const tableContainer = document.getElementById('screenAppointmentsTableBody'); // Ajusta este ID según tu HTML
-  const totalCounter = document.getElementById('screenAppointmentsTotal'); // Ajusta este ID según tu HTML
+  const tableContainer = document.getElementById('screenAppointmentsTableBody');
+  const totalCounter = document.getElementById('screenAppointmentsTotal');
   const dateElement = document.getElementById('screenAppointmentsDate');
 
-  // 1. Asignar fecha actual al reporte
+  // 1. Asignar fecha actual
   if (dateElement) {
-    const today = new Date();
-    dateElement.textContent = today.toLocaleDateString('es-ES');
+    dateElement.textContent = new Date().toLocaleDateString('es-ES');
   }
 
-  // 2. Obtener la lista actual de citas (global o local)
-  const appointmentsList = window.appointments || [];
+  // 2. Mostrar spinner/mensaje de carga
+  if (tableContainer) {
+    tableContainer.innerHTML = `<tr><td colspan="8" class="text-center py-4 text-gray-500">Cargando citas...</td></tr>`;
+  }
 
-  // 3. Renderizar las filas de la tabla si existen citas
+  // 3. Abrir el modal inmediatamente
+  if (modal) modal.classList.remove('hidden');
+
+  // 4. Obtener las citas actualizadas directamente de Supabase
+  let appointmentsList = [];
+  try {
+    const supabase = getSupabaseClient();
+    if (supabase) {
+      const { data, error } = await supabase
+        .from('appointments')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (!error && data) {
+        appointmentsList = data;
+        window.appointments = data; // Sincroniza la variable global
+      }
+    }
+  } catch (err) {
+    console.error('Error cargando citas para el reporte:', err);
+  }
+
+  // Si no obtuvo datos de la base de datos, usa el fallback en memoria
+  if (appointmentsList.length === 0 && window.appointments) {
+    appointmentsList = window.appointments;
+  }
+
+  // 5. Renderizar los datos devueltos
   if (tableContainer) {
     if (appointmentsList.length === 0) {
       tableContainer.innerHTML = `<tr><td colspan="8" class="text-center py-4 text-gray-500">No hay citas registradas.</td></tr>`;
     } else {
       tableContainer.innerHTML = appointmentsList.map(item => `
-        <tr class="border-b text-sm">
-          <td class="py-2 px-3 font-semibold">${item.code || 'AVO-CIT'}</td>
+        <tr class="border-b text-sm text-gray-700">
+          <td class="py-2 px-3 font-semibold">${item.appointment_code || item.code || 'AVO-CIT'}</td>
           <td class="py-2 px-3">${item.client_name || item.clientName || 'N/A'}</td>
           <td class="py-2 px-3">${item.client_phone || item.clientPhone || 'N/A'}</td>
           <td class="py-2 px-3">${item.service_name || item.service || 'N/A'}</td>
           <td class="py-2 px-3">${item.specialist || 'Asignación Automática'}</td>
           <td class="py-2 px-3">${item.branch || 'San Félix'}</td>
-          <td class="py-2 px-3">${item.created_at ? new Date(item.created_at).toLocaleString() : 'N/A'}</td>
-          <td class="py-2 px-3"><span class="bg-yellow-100 text-yellow-800 text-xs px-2 py-1 rounded">${item.status || 'En Verificación'}</span></td>
+          <td class="py-2 px-3">${item.appointment_date || item.created_at ? new Date(item.appointment_date || item.created_at).toLocaleString('es-ES') : 'N/A'}</td>
+          <td class="py-2 px-3"><span class="bg-yellow-100 text-yellow-800 text-xs px-2 py-1 rounded font-medium">${item.status || 'En Verificación'}</span></td>
         </tr>
       `).join('');
     }
   }
 
-  // 4. Actualizar contador total
+  // 6. Actualizar contador total
   if (totalCounter) {
     totalCounter.textContent = appointmentsList.length;
   }
-
-  // 5. Mostrar el modal
-  if (modal) modal.classList.remove('hidden');
 };
 
 window.printAppointmentsReport = function() {
