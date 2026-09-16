@@ -10,21 +10,14 @@ const manicureServices = [
     { id: 'Manicura Rusa + Gelificación', name: 'Manicura Rusa + Gelificación', price: 25.00, duration: '2 horas' }
 ];
 
-// Arreglo global de citas
 window.appointments = window.appointments || [];
 
-// Función auxiliar segura para obtener el cliente de Supabase (Corregida y Blindada)
+// Función auxiliar segura para obtener el cliente de Supabase
 function getSupabaseClient() {
     const s = window.supabaseClient || window.supabase || window._supabase;
     if (!s) return null;
-    
-    // Si viene envuelto en una propiedad default (típico de algunos imports de ES Modules)
     const client = s.default && typeof s.default.from === 'function' ? s.default : s;
-    
-    if (client && typeof client.from === 'function') {
-        return client;
-    }
-    return null;
+    return (client && typeof client.from === 'function') ? client : null;
 }
 
 // --- PROCESAR LA RESERVA DESDE EL FORMULARIO WEB ---
@@ -45,7 +38,6 @@ window.handleCreateAppointment = async (e) => {
         return;
     }
 
-    // Búsqueda flexible del servicio
     let service = manicureServices.find(s => s.id === serviceId || s.name === serviceId);
     if (!service) {
         const selectedText = serviceSelectElement.options[serviceSelectElement.selectedIndex].text;
@@ -62,7 +54,6 @@ window.handleCreateAppointment = async (e) => {
     const totalBs = (service.price * currentBcv).toFixed(2);
     const staffNameFinal = staff ? staff.name : 'Asignación Automática';
 
-    // Intentar guardar en Supabase de forma segura sin bloquear el flujo si falla
     try {
         const client = getSupabaseClient();
         if (client) {
@@ -75,18 +66,14 @@ window.handleCreateAppointment = async (e) => {
                 fecha_hora: `${date} - ${time}`,
                 estado: 'Pendiente'
             }]);
-            if (dbError) {
-                console.error('Aviso de Supabase al insertar:', dbError.message);
-            }
+            if (dbError) console.error('Aviso de Supabase al insertar:', dbError.message);
         }
     } catch (err) {
         console.error('Excepción al conectar con Supabase:', err);
     }
 
-    // Actualizar la tabla localmente de inmediato
     await loadAppointmentsFromSupabase();
 
-    // Crear mensaje directo para el WhatsApp de Avocado Shop
     let msg = `✨ *SOLICITUD DE CITA - AVOCADO SPA* ✨\n\n`;
     msg += `🆔 *Cita:* #${appointmentId}\n`;
     msg += `👤 *Cliente:* ${clientName}\n`;
@@ -98,10 +85,8 @@ window.handleCreateAppointment = async (e) => {
     msg += `💰 *Total:* $${service.price.toFixed(2)} (Bs. ${totalBs})\n\n`;
     msg += `_Quedo a la espera de la confirmación de la cita._`;
 
-    const encodedMsg = encodeURIComponent(msg);
-    window.open(`https://wa.me/584143943252?text=${encodedMsg}`, '_blank');
+    window.open(`https://wa.me/584143943252?text=${encodeURIComponent(msg)}`, '_blank');
 
-    // Resetear formulario y avisar con éxito
     const formEl = document.getElementById('appointmentForm') || document.querySelector('form');
     if (formEl) formEl.reset();
     alert(`✅ Tu solicitud de cita #${appointmentId} ha sido enviada con éxito.`);
@@ -127,47 +112,100 @@ async function loadAppointmentsFromSupabase() {
 
     if (data && data.length > 0) {
         window.appointments = data.map(item => ({
-            appointmentId: item.codigo || item.code || item.id || 'N/A',
-            clientName: item.cliente || item.client_name || item.nombre || 'Sin nombre',
-            clientPhone: item.telefono || item.client_phone || item.phone || '',
-            serviceName: item.servicio || item.service_name || 'Servicio General',
-            staffName: item.sucursal_especialista || item.staff || 'Asignación Automática',
-            dateTime: item.fecha_hora || item.date || 'Por definir',
-            status: item.estado || item.status || 'Pendiente'
+            id: item.id, // ID interno para operaciones de base de datos
+            appointmentId: item.codigo || item.code || 'N/A',
+            clientName: item.cliente || item.client_name || 'Sin nombre',
+            clientPhone: item.telefono || item.client_phone || '',
+            serviceName: item.servicio || 'Servicio General',
+            staffName: item.sucursal_especialista || 'Asignación Automática',
+            dateTime: item.fecha_hora || 'Por definir',
+            status: item.estado || 'Pendiente'
         }));
-
-        renderAppointmentsTableSafe();
     } else {
         window.appointments = [];
-        renderAppointmentsTableSafe();
     }
+    
+    renderAppointmentsTableSafe();
 }
 
-// Función para pintar la tabla de forma segura en la Agenda
-function renderAppointmentsTableSafe() {
-    const agendaHeader = Array.from(document.querySelectorAll('h3, h4, div')).find(el => el.textContent.includes('Agenda del Centro de Manicura'));
-    const parentCard = agendaHeader ? agendaHeader.closest('div') : null;
-    const targetTable = parentCard ? parentCard.querySelector('table') : document.querySelector('table');
-    const tbody = targetTable ? targetTable.querySelector('tbody') : null;
+// Función para cambiar el estado de la cita en tiempo real
+window.updateAppointmentStatus = async (appointmentId, newStatus) => {
+    const client = getSupabaseClient();
+    const app = window.appointments.find(a => a.appointmentId === appointmentId || a.id == appointmentId);
+    
+    if (client && app) {
+        const queryField = app.id ? 'id' : 'codigo';
+        const queryValue = app.id || app.appointmentId;
 
+        const { error } = await client
+            .from('appointments')
+            .update({ estado: newStatus })
+            .eq(queryField, queryValue);
+
+        if (error) {
+            console.error('Error al actualizar estado:', error.message);
+            alert('No se pudo actualizar el estado en la base de datos.');
+            return;
+        }
+    }
+    await loadAppointmentsFromSupabase();
+};
+
+// Función para eliminar cita
+window.deleteAppointment = async (appointmentId) => {
+    if (!confirm(`¿Estás seguro de eliminar la cita #${appointmentId}?`)) return;
+
+    const client = getSupabaseClient();
+    const app = window.appointments.find(a => a.appointmentId === appointmentId || a.id == appointmentId);
+
+    if (client && app) {
+        const queryField = app.id ? 'id' : 'codigo';
+        const queryValue = app.id || app.appointmentId;
+
+        const { error } = await client
+            .from('appointments')
+            .delete()
+            .eq(queryField, queryValue);
+
+        if (error) {
+            console.error('Error al eliminar cita:', error.message);
+            alert('No se pudo eliminar la cita de la base de datos.');
+            return;
+        }
+    }
+    await loadAppointmentsFromSupabase();
+};
+
+// Renderizar la tabla con diseño responsivo y selector interactivo
+function renderAppointmentsTableSafe() {
+    const tbody = document.getElementById('appointmentsTableBody');
     if (!tbody) return;
 
     if (!window.appointments || window.appointments.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="6" style="text-align: center; padding: 15px; color: #64748b;">No hay citas registradas en la base de datos.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="7" class="text-center p-4 text-slate-400 text-xs">No hay citas registradas en la base de datos.</td></tr>`;
         return;
     }
 
     tbody.innerHTML = window.appointments.map(app => `
-        <tr>
-            <td style="padding: 10px 16px; font-size: 13px;">${app.appointmentId}</td>
-            <td style="padding: 10px 16px; font-size: 13px;"><strong>${app.clientName}</strong><br><span style="font-size: 11px; color: #64748b;">${app.clientPhone}</span></td>
-            <td style="padding: 10px 16px; font-size: 13px;">${app.serviceName}</td>
-            <td style="padding: 10px 16px; font-size: 13px;">${app.staffName}</td>
-            <td style="padding: 10px 16px; font-size: 13px;">${app.dateTime}</td>
-            <td style="padding: 10px 16px; font-size: 13px;">
-                <span style="background: #eefbf4; color: #00a66c; padding: 4px 8px; border-radius: 4px; font-weight: bold; display: inline-block;">
-                    ${app.status}
-                </span>
+        <tr class="border-b text-xs text-slate-700 hover:bg-slate-50 transition">
+            <td class="p-2.5 font-bold">${app.appointmentId}</td>
+            <td class="p-2.5"><strong>${app.clientName}</strong><br><span class="text-[11px] text-slate-400">${app.clientPhone}</span></td>
+            <td class="p-2.5">${app.serviceName}</td>
+            <td class="p-2.5">${app.staffName}</td>
+            <td class="p-2.5">${app.dateTime}</td>
+            <td class="p-2.5">
+                <select onchange="updateAppointmentStatus('${app.appointmentId}', this.value)" class="text-xs font-bold rounded-lg p-1 outline-none border cursor-pointer ${
+                    app.status === 'Verificado' || app.status === 'Confirmada' ? 'bg-emerald-100 text-emerald-800 border-emerald-300' :
+                    app.status === 'En Verificación' || app.status === 'Pendiente' ? 'bg-amber-100 text-amber-800 border-amber-300' :
+                    'bg-red-100 text-red-800 border-red-300'
+                }">
+                    <option value="Pendiente" ${app.status === 'Pendiente' ? 'selected' : ''}>Pendiente</option>
+                    <option value="En Verificación" ${app.status === 'En Verificación' ? 'selected' : ''}>En Verificación</option>
+                    <option value="Verificado" ${app.status === 'Verificado' ? 'selected' : ''}>Verificado</option>
+                </select>
+            </td>
+            <td class="p-2.5 text-center">
+                <button onclick="deleteAppointment('${app.appointmentId}')" title="Eliminar Cita" class="bg-red-50 text-red-600 hover:bg-red-100 px-2.5 py-1 rounded-md text-xs font-bold transition">🗑️</button>
             </td>
         </tr>
     `).join('');
