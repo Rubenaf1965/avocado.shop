@@ -331,6 +331,10 @@
 
         <div class="lg:col-span-2 space-y-6">
           <!-- MÓDULO ADMINISTRATIVO DE AGENDA -->
+           <!-- Botón para ver las citas en pantalla completa -->
+          <button onclick="displayAppointmentsScreen()" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-semibold transition flex items-center gap-2 shadow-sm">
+  🖥️ Pantalla de Citas
+        </button>
           <div class="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm">
             <div class="flex items-center justify-between mb-4">
               <div>
@@ -747,7 +751,109 @@
       </div>
     </div>
   </div>
+<!-- Botón para ver las citas en pantalla completa -->
+<button onclick="displayAppointmentsScreen()" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-semibold transition flex items-center gap-2 shadow-sm">
+  🖥️ Pantalla de Citas
+</button>
+// --- FUNCIONES PARA LA PANTALLA DE CITAS DESDE EL PANEL ADMIN ---
+window.displayAppointmentsScreen = () => {
+  const tbody = document.getElementById('screenAppointmentsBody');
+  const modal = document.getElementById('screenAppointmentsModal');
+  
+  if (!tbody || !modal) {
+    // Si no tienes el modal creado en HTML, creamos una alerta o vista rápida
+    console.warn("Modal de pantalla de citas no encontrado en el DOM.");
+  }
 
+  // Renderizar las citas actuales en la tabla del modal
+  tbody.innerHTML = appointments.map(a => `
+    <tr class="border-b hover:bg-gray-50">
+      <td class="py-3 px-4 font-mono font-bold text-gray-700">${a.appointmentId}</td>
+      <td class="py-3 px-4 font-semibold text-gray-900">${a.clientName}</td>
+      <td class="py-3 px-4 text-gray-600">${a.serviceName}</td>
+      <td class="py-3 px-4 text-gray-600">${a.staffName}</td>
+      <td class="py-3 px-4 text-gray-600">${a.date} | ${a.time}</td>
+      <td class="py-3 px-4 text-center">
+        <span class="px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800">${a.status}</span>
+      </td>
+    </tr>
+  `).join('');
+
+  modal.classList.remove('hidden');
+};
+
+window.closeAppointmentsScreen = () => {
+  const modal = document.getElementById('screenAppointmentsModal');
+  if (modal) modal.classList.add('hidden');
+};
+// --- VALIDACIÓN Y REGISTRO DE CITAS WEB ---
+window.submitClientAppointment = async (event) => {
+  if (event) event.preventDefault();
+
+  // Capturar los valores del formulario web
+  const clientName = document.getElementById('clientNameInput')?.value.trim();
+  const clientPhone = document.getElementById('clientPhoneInput')?.value.trim();
+  const serviceName = document.getElementById('serviceSelect')?.value;
+  const staffName = document.getElementById('staffSelect')?.value; // Manicurista preferida o asignada
+  const date = document.getElementById('dateInput')?.value;
+  const time = document.getElementById('timeInput')?.value;
+
+  if (!clientName || !clientPhone || !staffName || !date || !time) {
+    alert("Por favor, completa todos los campos obligatorios de la cita.");
+    return;
+  }
+
+  const client = window.supabaseClient || window.supabase;
+  if (!client) {
+    alert("Error de conexión con la base de datos.");
+    return;
+  }
+
+  // 1. Verificar en tiempo real en Supabase si la manicurista ya está ocupada en esa fecha y hora
+  const { data: existingAppointments, error: fetchError } = await client
+    .from('appointments')
+    .select('*')
+    .eq('sucursal_especialista', staffName)
+    .eq('fecha_hora', `${date} - ${time}`);
+
+  if (fetchError) {
+    console.error("Error al verificar disponibilidad:", fetchError.message);
+  }
+
+  // Si encuentra coincidencias activas, se bloquea la reserva
+  if (existingAppointments && existingAppointments.length > 0) {
+    alert(`❌ Lo sentimos, la especialista "${staffName}" ya se encuentra ocupada en la fecha ${date} a las ${time}. Por favor, selecciona otro horario.`);
+    return;
+  }
+
+  // 2. Si está libre, proceder con la inserción a Supabase
+  const newCode = 'APT-' + Math.floor(1000 + Math.random() * 9000);
+  const { error: insertError } = await client
+    .from('appointments')
+    .insert([{
+      codigo: newCode,
+      cliente: clientName,
+      telefono: clientPhone,
+      servicio: serviceName,
+      sucursal_especialista: staffName,
+      fecha_hora: `${date} - ${time}`,
+      estado: 'Pendiente'
+    }]);
+
+  if (insertError) {
+    alert("Error al agendar la cita: " + insertError.message);
+    return;
+  }
+
+  alert(`¡Cita agendada con éxito! Tu código de seguimiento es ${newCode}.`);
+  
+  // Limpiar formulario o recargar
+  location.reload();
+};
+<form onsubmit="submitClientAppointment(event)">
+  <!-- Tus campos de nombre, teléfono, servicio, manicurista, fecha y hora -->
+  <button type="submit">Reservar Cita</button>
+</form>
  <<!-- Vinculación de Módulos JavaScript Externos sincronizados -->
   <script type="module" src="./supabaseClient.js?v=20260915"></script>
   <script type="module" src="./app.js?v=20260915"></script>

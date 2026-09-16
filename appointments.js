@@ -1,3 +1,34 @@
+// --- FUNCIONES PARA LA PANTALLA DE CITAS DESDE EL PANEL ADMIN ---
+window.displayAppointmentsScreen = () => {
+  const tbody = document.getElementById('screenAppointmentsBody');
+  const modal = document.getElementById('screenAppointmentsModal');
+  
+  if (!tbody || !modal) {
+    // Si no tienes el modal creado en HTML, creamos una alerta o vista rápida
+    console.warn("Modal de pantalla de citas no encontrado en el DOM.");
+  }
+
+  // Renderizar las citas actuales en la tabla del modal
+  tbody.innerHTML = appointments.map(a => `
+    <tr class="border-b hover:bg-gray-50">
+      <td class="py-3 px-4 font-mono font-bold text-gray-700">${a.appointmentId}</td>
+      <td class="py-3 px-4 font-semibold text-gray-900">${a.clientName}</td>
+      <td class="py-3 px-4 text-gray-600">${a.serviceName}</td>
+      <td class="py-3 px-4 text-gray-600">${a.staffName}</td>
+      <td class="py-3 px-4 text-gray-600">${a.date} | ${a.time}</td>
+      <td class="py-3 px-4 text-center">
+        <span class="px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800">${a.status}</span>
+      </td>
+    </tr>
+  `).join('');
+
+  modal.classList.remove('hidden');
+};
+
+window.closeAppointmentsScreen = () => {
+  const modal = document.getElementById('screenAppointmentsModal');
+  if (modal) modal.classList.add('hidden');
+};
 // --- CONSTANTES Y CONFIGURACIÓN DE CITAS ---
 const staffMembers = [
     { id: 'staff-1', name: 'Especialista San Félix', branch: 'san felix' },
