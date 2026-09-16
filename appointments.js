@@ -125,15 +125,13 @@ window.handleCreateAppointment = async (e) => {
   alert(`✅ Tu solicitud de cita #${appointmentId} ha sido enviada con éxito.`);
 };
 
-// --- CARGAR CITAS DESDE SUPABASE AL PANEL CON DETECCIÓN SEGURA ---
+// --- CARGAR Y RENDERIZAR CITAS DESDE SUPABASE ---
 async function loadAppointmentsFromSupabase() {
-  // Buscamos de forma exhaustiva la instancia activa de Supabase
   const client = window.supabaseClient || 
                  window.supabase || 
                  (typeof supabase !== 'undefined' && typeof supabase.from === 'function' ? supabase : null);
   
   if (!client || typeof client.from !== 'function') {
-    // Si aún no está listo, volvemos a intentar en un momento sin saturar
     setTimeout(loadAppointmentsFromSupabase, 500);
     return;
   }
@@ -147,12 +145,14 @@ async function loadAppointmentsFromSupabase() {
     return;
   }
 
+  console.log('Citas obtenidas de Supabase:', data); // <-- Para verificar en la consola (F12)
+
   if (data) {
     window.appointments = data.map(item => ({
-      appointmentId: item.codigo,
-      clientName: item.cliente,
-      clientPhone: item.telefono,
-      serviceName: item.servicio,
+      appointmentId: item.codigo || 'N/A',
+      clientName: item.cliente || 'Sin nombre',
+      clientPhone: item.telefono || '',
+      serviceName: item.servicio || 'Servicio General',
       branch: item.sucursal_especialista ? item.sucursal_especialista.split('(')[0].trim() : 'San Félix',
       staffName: item.sucursal_especialista || 'Asignación Automática',
       date: item.fecha_hora ? item.fecha_hora.split('-')[0].trim() : '',
@@ -161,18 +161,70 @@ async function loadAppointmentsFromSupabase() {
       price: 25.00
     }));
 
-    if (typeof renderAppointmentsTable === 'function') {
-      renderAppointmentsTable();
-    }
+    renderAppointmentsTableSafe();
   }
 }
 
-// --- EJECUTAR AL CARGAR LA VENTANA O ESCUCHAR EL CLIENTE ---
+// Función robusta para pintar las citas en la tabla de la interfaz
+function renderAppointmentsTableSafe() {
+  // Buscamos la tabla o el contenedor dentro de la "Agenda del Centro de Manicura"
+  let tbody = document.querySelector('#appointmentsTableBody') || 
+              document.querySelector('.agenda-table tbody') || 
+              document.querySelector('table tbody');
+
+  // Si la tabla no tiene tbody explícito, intentamos ubicar la tabla de la agenda
+  if (!tbody) {
+    const tables = document.querySelectorAll('table');
+    // Por lo general la segunda tabla es la de inventario, la primera o la que está en la sección de agenda es esta
+    if (tables.length > 0) {
+      // Buscamos la tabla que esté cerca de "Agenda del Centro de Manicura"
+      const agendaHeader = Array.from(document.querySelectorAll('h3, h4, div')).find(el => el.textContent.includes('Agenda del Centro de Manicura'));
+      if (agendaHeader) {
+        const parentCard = agendaHeader.closest('div');
+        const targetTable = parentCard ? parentCard.querySelector('table') : null;
+        if (targetTable) {
+          tbody = targetTable.querySelector('tbody') || targetTable;
+        }
+      }
+    }
+  }
+
+  if (!tbody) {
+    console.warn('No se encontró el contenedor de la tabla de citas en el DOM.');
+    return;
+  }
+
+  // Si hay una función original definida por el usuario, la usamos; si no, pintamos por defecto
+  if (typeof renderAppointmentsTable === 'function' && renderAppointmentsTable !== renderAppointmentsTableSafe) {
+    try {
+      renderAppointmentsTable();
+      return;
+    } catch (e) {
+      console.log('Usando renderizado seguro alternativo...');
+    }
+  }
+
+  // Pintar filas en la tabla
+  if (!window.appointments || window.appointments.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="6" style="text-align: center; padding: 15px; color: #64748b;">No hay citas registradas en la base de datos.</td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = window.appointments.map(app => `
+    <tr>
+      <td style="padding: 10px 16px; font-size: 13px;">${app.appointmentId}</td>
+      <td style="padding: 10px 16px; font-size: 13px;"><strong>${app.clientName}</strong><br><span style="font-size: 11px; color: #64748b;">${app.clientPhone}</span></td>
+      <td style="padding: 10px 16px; font-size: 13px;">${app.serviceName}</td>
+      <td style="padding: 10px 16px; font-size: 13px;">${app.staffName}</td>
+      <td style="padding: 10px 16px; font-size: 13px;">${app.date} - ${app.time}</td>
+      <td style="padding: 10px 16px; font-size: 13px;"><span style="background: #eefbf4; color: #00a66c; padding: 4px 8px; border-radius: 4px; font-weight: bold;">${app.status}</span></td>
+    </tr>
+  `).join('');
+}
+
 window.addEventListener('DOMContentLoaded', () => {
   loadAppointmentsFromSupabase();
 });
-
-// Por si el script de Supabase carga de último, aseguramos un disparador adicional
 window.addEventListener('load', () => {
   loadAppointmentsFromSupabase();
 });
