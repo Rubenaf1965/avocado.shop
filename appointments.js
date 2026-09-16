@@ -1,65 +1,32 @@
-// --- FUNCIONES PARA LA PANTALLA DE CITAS DESDE EL PANEL ADMIN ---
-window.displayAppointmentsScreen = () => {
-  const tbody = document.getElementById('screenAppointmentsBody');
-  const modal = document.getElementById('screenAppointmentsModal');
-  
-  if (!tbody || !modal) {
-    // Si no tienes el modal creado en HTML, creamos una alerta o vista rápida
-    console.warn("Modal de pantalla de citas no encontrado en el DOM.");
-  }
-
-  // Renderizar las citas actuales en la tabla del modal
-  tbody.innerHTML = appointments.map(a => `
-    <tr class="border-b hover:bg-gray-50">
-      <td class="py-3 px-4 font-mono font-bold text-gray-700">${a.appointmentId}</td>
-      <td class="py-3 px-4 font-semibold text-gray-900">${a.clientName}</td>
-      <td class="py-3 px-4 text-gray-600">${a.serviceName}</td>
-      <td class="py-3 px-4 text-gray-600">${a.staffName}</td>
-      <td class="py-3 px-4 text-gray-600">${a.date} | ${a.time}</td>
-      <td class="py-3 px-4 text-center">
-        <span class="px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800">${a.status}</span>
-      </td>
-    </tr>
-  `).join('');
-
-  modal.classList.remove('hidden');
-};
-
-window.closeAppointmentsScreen = () => {
-  const modal = document.getElementById('screenAppointmentsModal');
-  if (modal) modal.classList.add('hidden');
-};
 // --- CONSTANTES Y CONFIGURACIÓN DE CITAS ---
 const staffMembers = [
-    { id: 'staff-1', name: 'Especialista San Félix', branch: 'san felix' },
-    { id: 'staff-2', name: 'Especialista Alta Vista', branch: 'cc alta vista i' }
+    { id: 'stf-1', name: 'Valeria Gómez (Nail Art & Polygel)', branch: 'San Félix' },
+    { id: 'stf-2', name: 'Camila Rivas (Manicura Rusa)', branch: 'CC Alta Vista I' },
+    { id: 'stf-3', name: 'Daniela Torres (Pedicura Spa & Gel)', branch: 'CC Alta Vista II' }
 ];
 
 const manicureServices = [
-    { id: 'manicure', name: 'Manicure', price: 20.00, duration: '2 horas' },
-    { id: 'pedicure', name: 'Pedicure', price: 18.00, duration: '1 hora 40 minutos' },
-    { id: 'Manicura Rusa + Gelificación', name: 'Manicura Rusa + Gelificación', price: 25.00, duration: '2 horas' }
+    { id: 'srv-1', name: 'Manicura Rusa + Gelificación', price: 25.00, duration: '2 horas' },
+    { id: 'srv-2', name: 'Sistema de Uñas Polygel', price: 35.00, duration: '2 horas' },
+    { id: 'srv-3', name: 'Pedicura Spa + Semipermanente', price: 20.00, duration: '1 hora 40 minutos' },
+    { id: 'srv-4', name: 'Mantenimiento / Retiro', price: 15.00, duration: '1 hora' }
 ];
 
 window.appointments = window.appointments || [];
-
-// Variable global para almacenar el cliente de Supabase una vez inicializado de forma segura
 let cachedSupabaseClient = null;
 
-// Función auxiliar robusta para obtener el cliente de Supabase
+// OBTENER CLIENTE SUPABASE DE FORMA SEGURA
 function getSupabaseClient() {
     if (cachedSupabaseClient) return cachedSupabaseClient;
 
     const s = window.supabase;
     if (!s) return null;
 
-    // Si existe createClient en la librería global, intentamos inicializarlo si hay credenciales globales o del sistema
     if (typeof s.createClient === 'function' && window.SUPABASE_URL && window.SUPABASE_ANON_KEY) {
         cachedSupabaseClient = s.createClient(window.SUPABASE_URL, window.SUPABASE_ANON_KEY);
         return cachedSupabaseClient;
     }
 
-    // Compatibilidad con la estructura previa detectada en tu entorno
     const client = s.default && typeof s.default.from === 'function' ? s.default : s;
     if (client && typeof client.from === 'function') {
         cachedSupabaseClient = client;
@@ -73,14 +40,14 @@ function getSupabaseClient() {
 window.handleCreateAppointment = async (e) => {
     e.preventDefault();
 
-    const clientName = document.getElementById('appClientName').value.trim();
-    const clientPhone = document.getElementById('appClientPhone').value.trim();
-    const branch = document.getElementById('appBranchSelect').value;
+    const clientName = document.getElementById('appClientName')?.value.trim();
+    const clientPhone = document.getElementById('appClientPhone')?.value.trim();
+    const branch = document.getElementById('appBranchSelect')?.value;
     const serviceSelectElement = document.getElementById('appServiceSelect');
-    const serviceId = serviceSelectElement.value;
-    const staffId = document.getElementById('appStaffSelect').value;
-    const date = document.getElementById('appDate').value;
-    const time = document.getElementById('appTimeSelect').value;
+    const serviceId = serviceSelectElement?.value;
+    const staffId = document.getElementById('appStaffSelect')?.value;
+    const date = document.getElementById('appDate')?.value;
+    const time = document.getElementById('appTimeSelect')?.value;
 
     if (!clientName || !clientPhone || !date || !time) {
         alert("Por favor completa todos los campos requeridos.");
@@ -88,7 +55,7 @@ window.handleCreateAppointment = async (e) => {
     }
 
     let service = manicureServices.find(s => s.id === serviceId || s.name === serviceId);
-    if (!service) {
+    if (!service && serviceSelectElement) {
         const selectedText = serviceSelectElement.options[serviceSelectElement.selectedIndex].text;
         service = {
             id: serviceId,
@@ -98,7 +65,7 @@ window.handleCreateAppointment = async (e) => {
     }
 
     const staff = staffMembers.find(s => s.id === staffId);
-    const appointmentId = 'AVO-CIT-' + Math.floor(1000 + Math.random() * 9000);
+    const appointmentId = 'AVO-CIT-' + Math.floor(100000 + Math.random() * 900000);
     const currentBcv = window.bcvRate || 36.50;
     const totalBs = (service.price * currentBcv).toFixed(2);
     const staffNameFinal = staff ? staff.name : 'Asignación Automática';
@@ -136,7 +103,7 @@ window.handleCreateAppointment = async (e) => {
 
     window.open(`https://wa.me/584143943252?text=${encodeURIComponent(msg)}`, '_blank');
 
-    const formEl = document.getElementById('appointmentForm') || document.querySelector('form');
+    const formEl = document.getElementById('appointmentForm');
     if (formEl) formEl.reset();
     alert(`✅ Tu solicitud de cita #${appointmentId} ha sido enviada con éxito.`);
 };
@@ -175,9 +142,10 @@ async function loadAppointmentsFromSupabase() {
     }
     
     renderAppointmentsTableSafe();
+    renderAppointmentsScreen();
 }
 
-// Función para cambiar el estado de la cita en tiempo real
+// CAMBIAR ESTADO DE CITA
 window.updateAppointmentStatus = async (appointmentId, newStatus) => {
     const client = getSupabaseClient();
     const app = window.appointments.find(a => a.appointmentId === appointmentId || a.id == appointmentId);
@@ -200,7 +168,7 @@ window.updateAppointmentStatus = async (appointmentId, newStatus) => {
     await loadAppointmentsFromSupabase();
 };
 
-// Función para eliminar cita
+// ELIMINAR CITA
 window.deleteAppointment = async (appointmentId) => {
     if (!confirm(`¿Estás seguro de eliminar la cita #${appointmentId}?`)) return;
 
@@ -225,7 +193,7 @@ window.deleteAppointment = async (appointmentId) => {
     await loadAppointmentsFromSupabase();
 };
 
-// Renderizar la tabla con diseño responsivo y selector interactivo
+// RENDERIZAR TABLA ADMIN PRINCIPAL
 function renderAppointmentsTableSafe() {
     const tbody = document.getElementById('appointmentsTableBody');
     if (!tbody) return;
@@ -237,7 +205,7 @@ function renderAppointmentsTableSafe() {
 
     tbody.innerHTML = window.appointments.map(app => `
         <tr class="border-b text-xs text-slate-700 hover:bg-slate-50 transition">
-            <td class="p-2.5 font-bold">${app.appointmentId}</td>
+            <td class="p-2.5 font-bold font-mono">${app.appointmentId}</td>
             <td class="p-2.5"><strong>${app.clientName}</strong><br><span class="text-[11px] text-slate-400">${app.clientPhone}</span></td>
             <td class="p-2.5">${app.serviceName}</td>
             <td class="p-2.5">${app.staffName}</td>
@@ -251,6 +219,7 @@ function renderAppointmentsTableSafe() {
                     <option value="Pendiente" ${app.status === 'Pendiente' ? 'selected' : ''}>Pendiente</option>
                     <option value="En Verificación" ${app.status === 'En Verificación' ? 'selected' : ''}>En Verificación</option>
                     <option value="Verificado" ${app.status === 'Verificado' ? 'selected' : ''}>Verificado</option>
+                    <option value="Cancelado" ${app.status === 'Cancelado' ? 'selected' : ''}>Cancelado</option>
                 </select>
             </td>
             <td class="p-2.5 text-center">
@@ -260,6 +229,61 @@ function renderAppointmentsTableSafe() {
     `).join('');
 }
 
-// Inicializar al cargar la página
+// --- PANTALLA COMPLETA DE CITAS ---
+window.displayAppointmentsScreen = () => {
+    const modal = document.getElementById('appointmentsScreenModal');
+    if (modal) {
+        modal.classList.remove('hidden');
+        renderAppointmentsScreen();
+    }
+};
+
+window.closeAppointmentsScreen = () => {
+    const modal = document.getElementById('appointmentsScreenModal');
+    if (modal) modal.classList.add('hidden');
+};
+
+window.renderAppointmentsScreen = () => {
+    const tbody = document.getElementById('appointmentsScreenTableBody');
+    if (!tbody) return;
+
+    const query = (document.getElementById('appScreenSearch')?.value || '').toLowerCase();
+    const branchFilter = document.getElementById('appScreenBranchFilter')?.value || 'ALL';
+
+    const filtered = (window.appointments || []).filter(a => {
+        const matchesQuery = a.clientName.toLowerCase().includes(query) ||
+                             a.appointmentId.toLowerCase().includes(query) ||
+                             a.clientPhone.toLowerCase().includes(query);
+        const matchesBranch = branchFilter === 'ALL' || a.staffName.includes(branchFilter);
+        return matchesQuery && matchesBranch;
+    });
+
+    if (filtered.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="7" class="text-center p-6 text-slate-400 text-xs">No se encontraron citas coincidentes.</td></tr>`;
+        return;
+    }
+
+    tbody.innerHTML = filtered.map(app => `
+        <tr class="border-b text-xs text-slate-700 hover:bg-slate-50 transition">
+            <td class="p-3 font-bold font-mono text-slate-900">${app.appointmentId}</td>
+            <td class="p-3"><strong>${app.clientName}</strong><br><span class="text-[11px] text-slate-400">${app.clientPhone}</span></td>
+            <td class="p-3">${app.serviceName}</td>
+            <td class="p-3">${app.staffName}</td>
+            <td class="p-3">${app.dateTime}</td>
+            <td class="p-3">
+                <span class="px-2.5 py-1 rounded-full text-[10px] font-bold ${
+                    app.status === 'Verificado' || app.status === 'Confirmada' ? 'bg-emerald-100 text-emerald-800' :
+                    app.status === 'En Verificación' || app.status === 'Pendiente' ? 'bg-amber-100 text-amber-800' :
+                    'bg-red-100 text-red-800'
+                }">${app.status}</span>
+            </td>
+            <td class="p-3 text-center">
+                <button onclick="deleteAppointment('${app.appointmentId}')" class="bg-red-50 text-red-600 hover:bg-red-100 px-2.5 py-1 rounded-md text-xs font-bold transition">🗑️</button>
+            </td>
+        </tr>
+    `).join('');
+};
+
+// INICIALIZACIÓN
 window.addEventListener('DOMContentLoaded', loadAppointmentsFromSupabase);
 window.addEventListener('load', loadAppointmentsFromSupabase);
