@@ -329,3 +329,287 @@ window.closeAppointmentsScreen = function() {
 window.printAppointmentsReport = function() {
   window.print();
 };
+// --- GESTIÓN DE MANICURISTAS ---
+window.addStaffPrompt = async function() {
+  const name = prompt("Nombre y Apellido de la manicurista:");
+  if (!name) return;
+  
+  const specialty = prompt("Especialidad (ej. Nail Art, Polygel, Manicura Rusa):", "Manicura Rusa & Gel");
+  const branch = prompt("Sucursal (San Félix, CC Alta Vista I, CC Alta Vista II):", "San Félix");
+
+  if (name && specialty) {
+    // Si usas Supabase:
+    if (typeof supabaseClient !== 'undefined') {
+      const { data, error } = await supabaseClient
+        .from('staff')
+        .insert([{ name, specialty, branch, status: 'Activo' }]);
+      if (error) alert("Error al guardar: " + error.message);
+      else loadStaffTable();
+    } else {
+      // Sincronización Local / Fallback
+      alert(`Manicurista ${name} agregada correctamente.`);
+    }
+  }
+};
+
+window.toggleStaffStatus = async function(id, currentStatus) {
+  const newStatus = currentStatus === 'Activo' ? 'Inactivo' : 'Activo';
+  if (typeof supabaseClient !== 'undefined') {
+    await supabaseClient.from('staff').update({ status: newStatus }).eq('id', id);
+    loadStaffTable();
+  }
+};
+
+window.deleteStaff = async function(id) {
+  if (confirm("¿Estás seguro de eliminar esta manicurista?")) {
+    if (typeof supabaseClient !== 'undefined') {
+      await supabaseClient.from('staff').delete().eq('id', id);
+      loadStaffTable();
+    }
+  }
+};
+
+// --- GESTIÓN DE SERVICIOS Y PRECIOS ---
+window.addServicePrompt = async function() {
+  const name = prompt("Nombre del Servicio (ej. Pedicura Spa + Semipermanente):");
+  if (!name) return;
+  
+  const duration = prompt("Duración aproximada (ej. 45 min, 1h 30m):", "1 hora");
+  const priceUsd = parseFloat(prompt("Precio en USD ($):", "20.00"));
+
+  if (name && !isNaN(priceUsd)) {
+    if (typeof supabaseClient !== 'undefined') {
+      const { data, error } = await supabaseClient
+        .from('services')
+        .insert([{ name, duration, price_usd: priceUsd }]);
+      if (error) alert("Error al guardar servicio: " + error.message);
+      else loadServicesTable();
+    } else {
+      alert(`Servicio "${name}" guardado a $${priceUsd.toFixed(2)}.`);
+    }
+  }
+};
+
+window.deleteService = async function(id) {
+  if (confirm("¿Estás seguro de eliminar este servicio del catálogo?")) {
+    if (typeof supabaseClient !== 'undefined') {
+      await supabaseClient.from('services').delete().eq('id', id);
+      loadServicesTable();
+    }
+  }
+};
+// Renderizar Tabla Manicuristas
+export async function loadStaffTable() {
+  const tbody = document.getElementById('staffTableBody');
+  if (!tbody) return;
+
+  // Carga de datos (reemplazar según tu estructura de Supabase o array local)
+  let staffList = [];
+  if (typeof supabaseClient !== 'undefined') {
+    const { data } = await supabaseClient.from('staff').select('*');
+    staffList = data || [];
+  }
+
+  if (staffList.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="5" class="p-3 text-center text-slate-400">No hay manicuristas registradas</td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = staffList.map(stf => `
+    <tr class="border-b border-slate-50">
+      <td class="p-2.5 font-bold text-slate-800">${stf.name}</td>
+      <td class="p-2.5 text-slate-600">${stf.specialty}</td>
+      <td class="p-2.5 text-slate-600">${stf.branch || 'Todas'}</td>
+      <td class="p-2.5">
+        <span class="px-2 py-0.5 rounded-full text-[10px] font-bold ${stf.status === 'Activo' ? 'bg-emerald-100 text-emerald-800' : 'bg-gray-100 text-gray-600'}">
+          ${stf.status}
+        </span>
+      </td>
+      <td class="p-2.5 text-center">
+        <button onclick="toggleStaffStatus('${stf.id}', '${stf.status}')" class="text-xs mr-2">🔄</button>
+        <button onclick="deleteStaff('${stf.id}')" class="text-xs text-red-500">🗑️</button>
+      </td>
+    </tr>
+  `).join('');
+}
+
+// Renderizar Tabla Servicios
+export async function loadServicesTable() {
+  const tbody = document.getElementById('servicesTableBody');
+  if (!tbody) return;
+
+  const currentBcv = parseFloat(document.getElementById('bcvRateDisplay')?.innerText.replace('Bs. ', '')) || 1;
+
+  let servicesList = [];
+  if (typeof supabaseClient !== 'undefined') {
+    const { data } = await supabaseClient.from('services').select('*');
+    servicesList = data || [];
+  }
+
+  if (servicesList.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="5" class="p-3 text-center text-slate-400">No hay servicios registrados</td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = servicesList.map(srv => {
+    const priceBs = (srv.price_usd * currentBcv).toFixed(2);
+    return `
+      <tr class="border-b border-slate-50">
+        <td class="p-2.5 font-bold text-slate-800">${srv.name}</td>
+        <td class="p-2.5 text-slate-500">${srv.duration}</td>
+        <td class="p-2.5 font-bold text-emerald-700">$${Number(srv.price_usd).toFixed(2)}</td>
+        <td class="p-2.5 font-bold text-slate-700">Bs. ${priceBs}</td>
+        <td class="p-2.5 text-center">
+          <button onclick="deleteService('${srv.id}')" class="text-xs text-red-500">🗑️</button>
+        </td>
+      </tr>
+    `;
+  }).join('');
+}
+// ==========================================
+// MÓDULO DE GESTIÓN DE MANICURISTAS Y SERVICIOS
+// ==========================================
+
+// --- FUNCIONES GLOBALIZADAS PARA MANICURISTAS ---
+window.addStaffPrompt = async function() {
+  const name = prompt("Nombre y Apellido de la manicurista:");
+  if (!name) return;
+  
+  const specialty = prompt("Especialidad (ej. Nail Art, Polygel, Manicura Rusa):", "Manicura Rusa & Gel");
+  const branch = prompt("Sucursal (San Félix, CC Alta Vista I, CC Alta Vista II):", "San Félix");
+
+  if (name && specialty) {
+    if (typeof supabaseClient !== 'undefined' && supabaseClient) {
+      const { error } = await supabaseClient
+        .from('staff')
+        .insert([{ name, specialty, branch, status: 'Activo' }]);
+      if (error) alert("Error al guardar en Supabase: " + error.message);
+      else window.loadStaffTable();
+    } else {
+      alert(`Manicurista ${name} agregada correctamente.`);
+    }
+  }
+};
+
+window.toggleStaffStatus = async function(id, currentStatus) {
+  const newStatus = currentStatus === 'Activo' ? 'Inactivo' : 'Activo';
+  if (typeof supabaseClient !== 'undefined' && supabaseClient) {
+    await supabaseClient.from('staff').update({ status: newStatus }).eq('id', id);
+    window.loadStaffTable();
+  }
+};
+
+window.deleteStaff = async function(id) {
+  if (confirm("¿Estás seguro de eliminar esta manicurista?")) {
+    if (typeof supabaseClient !== 'undefined' && supabaseClient) {
+      await supabaseClient.from('staff').delete().eq('id', id);
+      window.loadStaffTable();
+    }
+  }
+};
+
+// --- FUNCIONES GLOBALIZADAS PARA SERVICIOS ---
+window.addServicePrompt = async function() {
+  const name = prompt("Nombre del Servicio (ej. Pedicura Spa + Semipermanente):");
+  if (!name) return;
+  
+  const duration = prompt("Duración estimada (ej. 45 min, 1h 30m):", "1 hora");
+  const priceUsd = parseFloat(prompt("Precio en USD ($):", "20.00"));
+
+  if (name && !isNaN(priceUsd)) {
+    if (typeof supabaseClient !== 'undefined' && supabaseClient) {
+      const { error } = await supabaseClient
+        .from('services')
+        .insert([{ name, duration, price_usd: priceUsd }]);
+      if (error) alert("Error al guardar servicio: " + error.message);
+      else window.loadServicesTable();
+    } else {
+      alert(`Servicio "${name}" guardado a $${priceUsd.toFixed(2)}.`);
+    }
+  }
+};
+
+window.deleteService = async function(id) {
+  if (confirm("¿Estás seguro de eliminar este servicio del catálogo?")) {
+    if (typeof supabaseClient !== 'undefined' && supabaseClient) {
+      await supabaseClient.from('services').delete().eq('id', id);
+      window.loadServicesTable();
+    }
+  }
+};
+
+// --- RENDERIZADO DE TABLAS EN EL PANEL ADMIN ---
+window.loadStaffTable = async function() {
+  const tbody = document.getElementById('staffTableBody');
+  if (!tbody) return;
+
+  let staffList = [];
+  if (typeof supabaseClient !== 'undefined' && supabaseClient) {
+    const { data } = await supabaseClient.from('staff').select('*');
+    staffList = data || [];
+  }
+
+  if (staffList.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="5" class="p-3 text-center text-slate-400">No hay manicuristas registradas</td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = staffList.map(stf => `
+    <tr class="border-b border-slate-50">
+      <td class="p-2.5 font-bold text-slate-800">${stf.name}</td>
+      <td class="p-2.5 text-slate-600">${stf.specialty}</td>
+      <td class="p-2.5 text-slate-600">${stf.branch || 'Todas'}</td>
+      <td class="p-2.5">
+        <span class="px-2 py-0.5 rounded-full text-[10px] font-bold ${stf.status === 'Activo' ? 'bg-emerald-100 text-emerald-800' : 'bg-gray-100 text-gray-600'}">
+          ${stf.status}
+        </span>
+      </td>
+      <td class="p-2.5 text-center">
+        <button onclick="window.toggleStaffStatus('${stf.id}', '${stf.status}')" class="text-xs mr-2" title="Cambiar Estado">🔄</button>
+        <button onclick="window.deleteStaff('${stf.id}')" class="text-xs text-red-500" title="Eliminar">🗑️</button>
+      </td>
+    </tr>
+  `).join('');
+};
+
+window.loadServicesTable = async function() {
+  const tbody = document.getElementById('servicesTableBody');
+  if (!tbody) return;
+
+  const bcvText = document.getElementById('bcvRateDisplay')?.innerText || '0';
+  const currentBcv = parseFloat(bcvText.replace(/[^0-9.]/g, '')) || 1;
+
+  let servicesList = [];
+  if (typeof supabaseClient !== 'undefined' && supabaseClient) {
+    const { data } = await supabaseClient.from('services').select('*');
+    servicesList = data || [];
+  }
+
+  if (servicesList.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="5" class="p-3 text-center text-slate-400">No hay servicios registrados</td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = servicesList.map(srv => {
+    const priceBs = (srv.price_usd * currentBcv).toFixed(2);
+    return `
+      <tr class="border-b border-slate-50">
+        <td class="p-2.5 font-bold text-slate-800">${srv.name}</td>
+        <td class="p-2.5 text-slate-500">${srv.duration}</td>
+        <td class="p-2.5 font-bold text-emerald-700">$${Number(srv.price_usd).toFixed(2)}</td>
+        <td class="p-2.5 font-bold text-slate-700">Bs. ${priceBs}</td>
+        <td class="p-2.5 text-center">
+          <button onclick="window.deleteService('${srv.id}')" class="text-xs text-red-500" title="Eliminar">🗑️</button>
+        </td>
+      </tr>
+    `;
+  }).join('');
+};
+
+// Carga inicial automática al inicializar el módulo
+document.addEventListener('DOMContentLoaded', () => {
+  setTimeout(() => {
+    if (window.loadStaffTable) window.loadStaffTable();
+    if (window.loadServicesTable) window.loadServicesTable();
+  }, 500);
+});
