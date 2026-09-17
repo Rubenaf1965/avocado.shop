@@ -22,6 +22,39 @@ function getActiveBcvRate() {
     return 847.44; // Fallback
 }
 
+// FUNCIÓN PARA REPARAR Y CONVERTIR FECHA/HORA A TIMESTAMPTZ ISO VÁLIDO DE POSTGRESQL
+function formatToISO(dateStr, timeStr) {
+    try {
+        if (!dateStr) return new Date().toISOString();
+        
+        let cleanedTime = (timeStr || '09:00').trim().toUpperCase();
+        let hours = 9;
+        let minutes = 0;
+
+        const isPM = cleanedTime.includes('PM');
+        const isAM = cleanedTime.includes('AM');
+
+        // Remover AM / PM para parsear números
+        cleanedTime = cleanedTime.replace(/AM|PM/g, '').trim();
+        const parts = cleanedTime.split(':');
+
+        if (parts.length >= 1) hours = parseInt(parts[0], 10) || 0;
+        if (parts.length >= 2) minutes = parseInt(parts[1], 10) || 0;
+
+        if (isPM && hours < 12) hours += 12;
+        if (isAM && hours === 12) hours = 0;
+
+        const hStr = String(hours).padStart(2, '0');
+        const mStr = String(minutes).padStart(2, '0');
+
+        // Retorna formato ISO compatible con timestamptz (24h)
+        return `${dateStr}T${hStr}:${mStr}:00+00:00`;
+    } catch (err) {
+        console.error("Error al formatear timestamptz:", err);
+        return `${dateStr}T09:00:00+00:00`;
+    }
+}
+
 // POBLAR SELECTS DEL FORMULARIO DE RESERVA DESDE SUPABASE
 window.populateAppointmentSelects = async function() {
     const client = getSupabaseClient();
@@ -48,7 +81,7 @@ window.populateAppointmentSelects = async function() {
     }
 };
 
-// --- PROCESAR LA RESERVA DESDE EL FORMULARIO WEB (CON VALIDACIÓN DE DISPONIBILIDAD) ---
+// --- PROCESAR LA RESERVA DESDE EL FORMULARIO WEB ---
 window.handleCreateAppointment = async (e) => {
     e.preventDefault();
 
@@ -73,8 +106,9 @@ window.handleCreateAppointment = async (e) => {
     const staffNameFinal = selectedStaffOption?.dataset?.name || selectedStaffOption?.text.split('(')[0].trim() || 'Asignación Automática';
 
     const sucursalEspecialistaFinal = `${branch} (${staffNameFinal})`;
-    const formatoFechaHora1 = `${date}T${time}:00+00:00`;
-    const formatoFechaHora2 = `${date} - ${time}`;
+    
+    // Normalización de la fecha para PostgreSQL
+    const fechaHoraISO = formatToISO(date, time);
 
     const client = getSupabaseClient();
 
@@ -91,20 +125,20 @@ window.handleCreateAppointment = async (e) => {
             }
 
             if (existingAppointments && existingAppointments.length > 0) {
-                // Verificar si existe alguna cita no cancelada en la misma fecha y hora
                 const conflicto = existingAppointments.find(app => {
                     const estado = (app.estado || '').toLowerCase();
                     const esActiva = estado !== 'cancelado' && estado !== 'cancelada';
-                    const mismaFechaHora = app.fecha_hora === formatoFechaHora1 || 
-                                          app.fecha_hora === formatoFechaHora2 || 
-                                          app.fecha_hora.includes(`${date}T${time}`) || 
+                    
+                    // Comprobar coincidencia exacta o por subcadena de fecha
+                    const mismaFechaHora = app.fecha_hora === fechaHoraISO || 
+                                          app.fecha_hora.includes(`${date}T`) || 
                                           app.fecha_hora.includes(`${date} - ${time}`);
                     return esActiva && mismaFechaHora;
                 });
 
                 if (conflicto) {
                     alert(`⚠️ NO DISPONIBILIDAD\n\nLa especialista ${staffNameFinal} en la sucursal ${branch} ya cuenta con una cita registrada el ${date} a las ${time}.\n\nPor favor, selecciona otro horario o especialista.`);
-                    return; // Bloquea la creación y no abre WhatsApp
+                    return;
                 }
             }
         } catch (err) {
@@ -125,13 +159,13 @@ window.handleCreateAppointment = async (e) => {
                 telefono: clientPhone,
                 servicio: serviceName,
                 sucursal_especialista: sucursalEspecialistaFinal,
-                fecha_hora: formatoFechaHora1,
+                fecha_hora: fechaHoraISO,
                 estado: 'Pendiente'
             }]);
             
             if (dbError) {
-                console.error('Aviso de Supabase al insertar:', dbError.message);
-                alert("Hubo un error al guardar la cita en la base de datos.");
+                console.error('Error de Supabase al insertar:', dbError.message);
+                alert("Hubo un error al guardar la cita en la base de datos: " + dbError.message);
                 return;
             }
         }
