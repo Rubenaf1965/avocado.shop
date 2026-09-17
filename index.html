@@ -221,7 +221,7 @@
       <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
         <div>
           <h1 class="text-2xl font-bold text-slate-900">🥑 Dashboard Administrativo</h1>
-          <p class="text-xs text-slate-500" id="adminHeaderSub">Control Multi-Sucursal de Inventario, Vendedores y Facturación en Tiempo Real</p>
+          <p class="text-xs text-slate-500" id="adminHeaderSub">Control Multi-Sucursal de Inventario, Vendedores, Citas y Facturación en Tiempo Real</p>
         </div>
 
         <div class="flex flex-wrap items-center gap-2">
@@ -406,6 +406,64 @@
                 </thead>
                 <tbody id="appointmentsTableBody">
                   <!-- Render dinámico desde Supabase -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- MÓDULO ADMINISTRATIVO DE MANICURISTAS (NUEVO) -->
+          <div class="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm">
+            <div class="flex justify-between items-center mb-3">
+              <div>
+                <h3 class="text-sm font-bold text-slate-800">💅 Equipo de Manicuristas</h3>
+                <p class="text-[11px] text-slate-400">Administración del personal asignado a los servicios del Spa</p>
+              </div>
+              <button onclick="addStaffPrompt()" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-3 py-1.5 rounded-lg transition flex items-center gap-1">
+                ➕ Agregar Manicurista
+              </button>
+            </div>
+            <div class="overflow-x-auto">
+              <table class="w-full text-left text-xs">
+                <thead class="bg-slate-50 text-slate-500 font-semibold">
+                  <tr>
+                    <th class="p-2.5">Especialista</th>
+                    <th class="p-2.5">Especialidad</th>
+                    <th class="p-2.5">Sucursal</th>
+                    <th class="p-2.5">Estado</th>
+                    <th class="p-2.5 text-center">Acciones</th>
+                  </tr>
+                </thead>
+                <tbody id="staffTableBody" class="divide-y divide-slate-100">
+                  <!-- Carga dinámica vía JS -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- MÓDULO ADMINISTRATIVO DE SERVICIOS Y PRECIOS (NUEVO) -->
+          <div class="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm">
+            <div class="flex justify-between items-center mb-3">
+              <div>
+                <h3 class="text-sm font-bold text-slate-800">✨ Catálogo de Servicios & Precios</h3>
+                <p class="text-[11px] text-slate-400">Configura los tratamientos ofrecidos para agendamiento online</p>
+              </div>
+              <button onclick="addServicePrompt()" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-3 py-1.5 rounded-lg transition flex items-center gap-1">
+                ➕ Nuevo Servicio
+              </button>
+            </div>
+            <div class="overflow-x-auto">
+              <table class="w-full text-left text-xs">
+                <thead class="bg-slate-50 text-slate-500 font-semibold">
+                  <tr>
+                    <th class="p-2.5">Servicio</th>
+                    <th class="p-2.5">Duración Aprox.</th>
+                    <th class="p-2.5">Precio ($)</th>
+                    <th class="p-2.5">Precio (Bs.)</th>
+                    <th class="p-2.5 text-center">Acciones</th>
+                  </tr>
+                </thead>
+                <tbody id="servicesTableBody" class="divide-y divide-slate-100">
+                  <!-- Carga dinámica vía JS -->
                 </tbody>
               </table>
             </div>
