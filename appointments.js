@@ -19,10 +19,10 @@ function getActiveBcvRate() {
         const parsed = parseFloat(bcvBadge.innerText.replace(/[^0-9.]/g, ''));
         if (!isNaN(parsed) && parsed > 0) return parsed;
     }
-    return 847.44; // Fallback
+    return 36.50; // Fallback por defecto
 }
 
-// FUNCIÓN PARA REPARAR Y CONVERTIR FECHA/HORA A TIMESTAMPTZ ISO VÁLIDO DE POSTGRESQL
+// FUNCIÓN PARA CONVERTIR FECHA Y HORA A TIMESTAMPTZ ISO COMPATIBLE CON POSTGRESQL
 function formatToISO(dateStr, timeStr) {
     try {
         if (!dateStr) return new Date().toISOString();
@@ -34,7 +34,6 @@ function formatToISO(dateStr, timeStr) {
         const isPM = cleanedTime.includes('PM');
         const isAM = cleanedTime.includes('AM');
 
-        // Remover AM / PM para parsear números
         cleanedTime = cleanedTime.replace(/AM|PM/g, '').trim();
         const parts = cleanedTime.split(':');
 
@@ -47,7 +46,6 @@ function formatToISO(dateStr, timeStr) {
         const hStr = String(hours).padStart(2, '0');
         const mStr = String(minutes).padStart(2, '0');
 
-        // Retorna formato ISO compatible con timestamptz (24h)
         return `${dateStr}T${hStr}:${mStr}:00+00:00`;
     } catch (err) {
         console.error("Error al formatear timestamptz:", err);
@@ -73,7 +71,7 @@ window.populateAppointmentSelects = async function() {
             }).join('');
     }
 
-    // Cargar Manicuristas
+    // Cargar Manicuristas/Especialistas activas
     const { data: staffData } = await client.from('manicuristas').select('*').eq('activo', true);
     if (staffSelect && staffData && staffData.length > 0) {
         staffSelect.innerHTML = '<option value="">Selecciona una especialista</option>' + 
@@ -81,38 +79,35 @@ window.populateAppointmentSelects = async function() {
     }
 };
 
-// --- PROCESAR LA RESERVA DESDE EL FORMULARIO WEB ---
+// PROCESAR RESERVA DESDE EL FORMULARIO WEB
 window.handleCreateAppointment = async (e) => {
     e.preventDefault();
 
-    const clientName = document.getElementById('appClientName').value.trim();
-    const clientPhone = document.getElementById('appClientPhone').value.trim();
-    const branch = document.getElementById('appBranchSelect').value;
+    const clientName = document.getElementById('appClientName')?.value.trim();
+    const clientPhone = document.getElementById('appClientPhone')?.value.trim();
+    const branch = document.getElementById('appBranchSelect')?.value;
     const serviceSelectElement = document.getElementById('appServiceSelect');
     const staffSelectElement = document.getElementById('appStaffSelect');
-    const date = document.getElementById('appDate').value;
-    const time = document.getElementById('appTimeSelect').value;
+    const date = document.getElementById('appDate')?.value;
+    const time = document.getElementById('appTimeSelect')?.value;
 
     if (!clientName || !clientPhone || !date || !time) {
         alert("Por favor completa todos los campos requeridos.");
         return;
     }
 
-    const selectedServiceOption = serviceSelectElement.options[serviceSelectElement.selectedIndex];
+    const selectedServiceOption = serviceSelectElement?.options[serviceSelectElement.selectedIndex];
     const serviceName = selectedServiceOption?.dataset?.name || selectedServiceOption?.text.split('(')[0].trim() || 'Servicio General';
     const servicePrice = parseFloat(selectedServiceOption?.dataset?.price) || 20.00;
 
-    const selectedStaffOption = staffSelectElement.options[staffSelectElement.selectedIndex];
+    const selectedStaffOption = staffSelectElement?.options[staffSelectElement.selectedIndex];
     const staffNameFinal = selectedStaffOption?.dataset?.name || selectedStaffOption?.text.split('(')[0].trim() || 'Asignación Automática';
 
     const sucursalEspecialistaFinal = `${branch} (${staffNameFinal})`;
-    
-    // Normalización de la fecha para PostgreSQL
     const fechaHoraISO = formatToISO(date, time);
-
     const client = getSupabaseClient();
 
-    // 1. VALIDAR DISPONIBILIDAD EN SUPABASE ANTES DE REGISTRAR
+    // 1. Validar disponibilidad en Supabase
     if (client) {
         try {
             const { data: existingAppointments, error: checkError } = await client
@@ -120,16 +115,10 @@ window.handleCreateAppointment = async (e) => {
                 .select('*')
                 .eq('sucursal_especialista', sucursalEspecialistaFinal);
 
-            if (checkError) {
-                console.error('Error al verificar citas existentes:', checkError.message);
-            }
-
-            if (existingAppointments && existingAppointments.length > 0) {
+            if (!checkError && existingAppointments && existingAppointments.length > 0) {
                 const conflicto = existingAppointments.find(app => {
                     const estado = (app.estado || '').toLowerCase();
                     const esActiva = estado !== 'cancelado' && estado !== 'cancelada';
-                    
-                    // Comprobar coincidencia exacta o por subcadena de fecha
                     const mismaFechaHora = app.fecha_hora === fechaHoraISO || 
                                           app.fecha_hora.includes(`${date}T`) || 
                                           app.fecha_hora.includes(`${date} - ${time}`);
@@ -146,7 +135,7 @@ window.handleCreateAppointment = async (e) => {
         }
     }
 
-    // 2. REGISTRO DE LA CITA
+    // 2. Registro de la cita
     const appointmentId = 'AVO-CIT-' + Math.floor(1000 + Math.random() * 9000);
     const currentBcv = getActiveBcvRate();
     const totalBs = (servicePrice * currentBcv).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -164,7 +153,6 @@ window.handleCreateAppointment = async (e) => {
             }]);
             
             if (dbError) {
-                console.error('Error de Supabase al insertar:', dbError.message);
                 alert("Hubo un error al guardar la cita en la base de datos: " + dbError.message);
                 return;
             }
@@ -175,7 +163,7 @@ window.handleCreateAppointment = async (e) => {
 
     await loadAppointmentsFromSupabase();
 
-    // 3. ENVÍO A WHATSAPP
+    // 3. Enviar notificación por WhatsApp
     let msg = `✨ *SOLICITUD DE CITA - AVOCADO SPA* ✨\n\n`;
     msg += `🆔 *Cita:* #${appointmentId}\n`;
     msg += `👤 *Cliente:* ${clientName}\n`;
@@ -194,7 +182,7 @@ window.handleCreateAppointment = async (e) => {
     alert(`✅ Tu solicitud de cita #${appointmentId} ha sido enviada con éxito.`);
 };
 
-// --- CARGAR Y RENDERIZAR CITAS DESDE SUPABASE ---
+// CARGAR Y RENDERIZAR CITAS DESDE SUPABASE
 async function loadAppointmentsFromSupabase() {
     const client = getSupabaseClient();
     
@@ -203,9 +191,7 @@ async function loadAppointmentsFromSupabase() {
         return;
     }
     
-    const { data, error } = await client
-        .from('appointments')
-        .select('*');
+    const { data, error } = await client.from('appointments').select('*');
 
     if (error) {
         console.error('Error al cargar citas de Supabase:', error.message);
@@ -230,7 +216,7 @@ async function loadAppointmentsFromSupabase() {
     renderAppointmentsTableSafe();
 }
 
-// Cambiar el estado de la cita
+// CAMBIAR ESTADO DE LA CITA
 window.updateAppointmentStatus = async (appointmentId, newStatus) => {
     const client = getSupabaseClient();
     const app = window.appointments.find(a => a.appointmentId === appointmentId || a.id == appointmentId);
@@ -245,7 +231,6 @@ window.updateAppointmentStatus = async (appointmentId, newStatus) => {
             .eq(queryField, queryValue);
 
         if (error) {
-            console.error('Error al actualizar estado:', error.message);
             alert('No se pudo actualizar el estado en la base de datos.');
             return;
         }
@@ -253,7 +238,7 @@ window.updateAppointmentStatus = async (appointmentId, newStatus) => {
     await loadAppointmentsFromSupabase();
 };
 
-// Eliminar cita
+// ELIMINAR CITA
 window.deleteAppointment = async (appointmentId) => {
     if (!confirm(`¿Estás seguro de eliminar la cita #${appointmentId}?`)) return;
 
@@ -270,7 +255,6 @@ window.deleteAppointment = async (appointmentId) => {
             .eq(queryField, queryValue);
 
         if (error) {
-            console.error('Error al eliminar cita:', error.message);
             alert('No se pudo eliminar la cita de la base de datos.');
             return;
         }
@@ -278,7 +262,7 @@ window.deleteAppointment = async (appointmentId) => {
     await loadAppointmentsFromSupabase();
 };
 
-// Renderizar tabla de citas
+// RENDERIZAR TABLA DE CITAS
 function renderAppointmentsTableSafe() {
     const tbody = document.getElementById('appointmentsTableBody');
     if (!tbody) return;
@@ -314,249 +298,227 @@ function renderAppointmentsTableSafe() {
     `).join('');
 }
 
-// --- FUNCIONES DE REPORTES EN PANTALLA E IMPRESIÓN ---
+// FUNCIONES DE REPORTE Y REVISIÓN EN PANTALLA
 window.displayAppointmentsScreen = async function() {
-  const modal = document.getElementById('screenAppointmentsModal');
-  const tableContainer = document.getElementById('screenAppointmentsBody');
-  const totalCounter = document.getElementById('appReportTotalCount');
-  const dateElement = document.getElementById('appReportDate');
+    const modal = document.getElementById('screenAppointmentsModal');
+    const tableContainer = document.getElementById('screenAppointmentsBody');
+    const totalCounter = document.getElementById('appReportTotalCount');
+    const dateElement = document.getElementById('appReportDate');
 
-  if (dateElement) {
-    dateElement.textContent = new Date().toLocaleDateString('es-ES');
-  }
+    if (dateElement) dateElement.textContent = new Date().toLocaleDateString('es-VE');
+    if (tableContainer) tableContainer.innerHTML = `<tr><td colspan="8" class="text-center py-4 text-slate-400 text-xs">Cargando citas desde Supabase...</td></tr>`;
+    if (modal) modal.classList.remove('hidden');
 
-  if (tableContainer) {
-    tableContainer.innerHTML = `<tr><td colspan="8" class="text-center py-4 text-slate-400 text-xs">Cargando citas desde Supabase...</td></tr>`;
-  }
-
-  if (modal) modal.classList.remove('hidden');
-
-  let appointmentsList = [];
-
-  try {
+    let appointmentsList = [];
     const supabase = getSupabaseClient();
+
     if (supabase) {
-      const { data, error } = await supabase.from('appointments').select('*');
-      if (!error && data && data.length > 0) {
-        appointmentsList = data;
-      }
+        const { data, error } = await supabase.from('appointments').select('*');
+        if (!error && data) appointmentsList = data;
     }
-  } catch (err) {
-    console.error('Error recuperando citas para reporte:', err);
-  }
 
-  if (appointmentsList.length === 0 && Array.isArray(window.appointments) && window.appointments.length > 0) {
-    appointmentsList = window.appointments;
-  }
-
-  if (tableContainer) {
-    if (appointmentsList.length === 0) {
-      tableContainer.innerHTML = `<tr><td colspan="8" class="text-center py-4 text-slate-400 text-xs">No hay citas registradas en el sistema.</td></tr>`;
-    } else {
-      tableContainer.innerHTML = appointmentsList.map(item => {
-        const code = item.codigo || item.appointmentId || item.code || 'AVO-CIT';
-        const client = item.cliente || item.clientName || 'N/A';
-        const phone = item.telefono || item.clientPhone || 'N/A';
-        const service = item.servicio || item.serviceName || 'N/A';
-        const staffAndBranch = item.sucursal_especialista || item.staffName || 'San Félix';
-        const dateTime = item.fecha_hora || item.dateTime || 'N/A';
-        const status = item.estado || item.status || 'Pendiente';
-
-        return `
-          <tr class="border-b text-xs text-slate-700 hover:bg-slate-50 transition">
-            <td class="p-2.5 font-bold">${code}</td>
-            <td class="p-2.5">${client}</td>
-            <td class="p-2.5">${phone}</td>
-            <td class="p-2.5">${service}</td>
-            <td class="p-2.5">${staffAndBranch}</td>
-            <td class="p-2.5">${staffAndBranch.split('(')[0].trim()}</td>
-            <td class="p-2.5">${dateTime}</td>
-            <td class="p-2.5 text-center">
-              <span class="px-2 py-1 rounded-full text-[10px] font-bold ${
-                status === 'Verificado' || status === 'Confirmada' ? 'bg-emerald-100 text-emerald-800' :
-                status === 'En Verificación' || status === 'Pendiente' ? 'bg-amber-100 text-amber-800' :
-                'bg-red-100 text-red-800'
-              }">${status}</span>
-            </td>
-          </tr>
-        `;
-      }).join('');
+    if (appointmentsList.length === 0 && Array.isArray(window.appointments)) {
+        appointmentsList = window.appointments;
     }
-  }
 
-  if (totalCounter) {
-    totalCounter.textContent = `Total Citas: ${appointmentsList.length}`;
-  }
+    if (tableContainer) {
+        if (appointmentsList.length === 0) {
+            tableContainer.innerHTML = `<tr><td colspan="8" class="text-center py-4 text-slate-400 text-xs">No hay citas registradas en el sistema.</td></tr>`;
+        } else {
+            tableContainer.innerHTML = appointmentsList.map(item => {
+                const code = item.codigo || item.appointmentId || item.code || 'AVO-CIT';
+                const client = item.cliente || item.clientName || 'N/A';
+                const phone = item.telefono || item.clientPhone || 'N/A';
+                const service = item.servicio || item.serviceName || 'N/A';
+                const staffAndBranch = item.sucursal_especialista || item.staffName || 'San Félix';
+                const dateTime = item.fecha_hora || item.dateTime || 'N/A';
+                const status = item.estado || item.status || 'Pendiente';
+
+                return `
+                    <tr class="border-b text-xs text-slate-700 hover:bg-slate-50 transition">
+                        <td class="p-2.5 font-bold">${code}</td>
+                        <td class="p-2.5">${client}</td>
+                        <td class="p-2.5">${phone}</td>
+                        <td class="p-2.5">${service}</td>
+                        <td class="p-2.5">${staffAndBranch}</td>
+                        <td class="p-2.5">${dateTime}</td>
+                        <td class="p-2.5 text-center">
+                            <span class="px-2 py-1 rounded-full text-[10px] font-bold ${
+                                status === 'Verificado' || status === 'Confirmada' ? 'bg-emerald-100 text-emerald-800' :
+                                status === 'En Verificación' || status === 'Pendiente' ? 'bg-amber-100 text-amber-800' :
+                                'bg-red-100 text-red-800'
+                            }">${status}</span>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+        }
+    }
+
+    if (totalCounter) totalCounter.textContent = `Total Citas: ${appointmentsList.length}`;
 };
 
 window.closeAppointmentsScreen = function() {
-  const modal = document.getElementById('screenAppointmentsModal');
-  if (modal) modal.classList.add('hidden');
+    const modal = document.getElementById('screenAppointmentsModal');
+    if (modal) modal.classList.add('hidden');
 };
 
 window.printAppointmentsReport = function() {
-  window.displayAppointmentsScreen();
-  setTimeout(() => {
-    window.print();
-  }, 300);
+    window.displayAppointmentsScreen();
+    setTimeout(() => { window.print(); }, 300);
 };
 
-// ==========================================
-// GESTIÓN DE MANICURISTAS Y SERVICIOS (SUPABASE)
-// ==========================================
-
+// GESTIÓN DE MANICURISTAS Y SERVICIOS EN SUPABASE
 window.addStaffPrompt = async function() {
-  const nombre = prompt("Nombre y Apellido de la manicurista:");
-  if (!nombre) return;
-  
-  const sucursal = prompt("Sucursal (San Félix, CC Alta Vista I, CC Alta Vista II):", "San Félix");
+    const nombre = prompt("Nombre y Apellido de la manicurista:");
+    if (!nombre) return;
+    
+    const sucursal = prompt("Sucursal (San Félix, CC Alta Vista I, CC Alta Vista II):", "San Félix");
 
-  if (nombre) {
     const client = getSupabaseClient();
     if (client) {
-      const { error } = await client.from('manicuristas').insert([{ nombre, sucursal, activo: true }]);
-      if (error) {
-        alert("Error al guardar en Supabase: " + error.message);
-      } else {
-        await window.loadStaffTable();
-        await window.populateAppointmentSelects();
-      }
+        const { error } = await client.from('manicuristas').insert([{ nombre, sucursal, activo: true }]);
+        if (error) {
+            alert("Error al guardar en Supabase: " + error.message);
+        } else {
+            await window.loadStaffTable();
+            await window.populateAppointmentSelects();
+        }
     }
-  }
 };
 
 window.deleteStaff = async function(id) {
-  if (!confirm("¿Estás seguro de eliminar esta manicurista?")) return;
-  
-  const client = getSupabaseClient();
-  if (client) {
-    const { error } = await client.from('manicuristas').delete().eq('id', id);
-    if (error) {
-      alert("Error al eliminar: " + error.message);
-    } else {
-      await window.loadStaffTable();
-      await window.populateAppointmentSelects();
+    if (!confirm("¿Estás seguro de eliminar esta manicurista?")) return;
+    
+    const client = getSupabaseClient();
+    if (client) {
+        const { error } = await client.from('manicuristas').delete().eq('id', id);
+        if (error) {
+            alert("Error al eliminar: " + error.message);
+        } else {
+            await window.loadStaffTable();
+            await window.populateAppointmentSelects();
+        }
     }
-  }
 };
 
 window.addServicePrompt = async function() {
-  const nombre = prompt("Nombre del Servicio (ej. Pedicura Spa + Semipermanente):");
-  if (!nombre) return;
-  
-  const duracion = prompt("Duración estimada (ej. 45 min, 1h 30m):", "1 hora");
-  const precioInput = parseFloat(prompt("Precio en USD ($):", "20.00"));
+    const nombre = prompt("Nombre del Servicio (ej. Pedicura Spa + Semipermanente):");
+    if (!nombre) return;
+    
+    const duracion = prompt("Duración estimada (ej. 45 min, 1h 30m):", "1 hora");
+    const precioInput = parseFloat(prompt("Precio en USD ($):", "20.00"));
 
-  if (nombre && !isNaN(precioInput)) {
-    const client = getSupabaseClient();
-    if (client) {
-      const { error } = await client.from('servicios').insert([{ 
-        nombre: nombre, 
-        duracion: duracion, 
-        precio_usd: precioInput, 
-        precio: precioInput 
-      }]);
-      
-      if (error) {
-        alert("Error al guardar servicio: " + error.message);
-      } else {
-        await window.loadServicesTable();
-        await window.populateAppointmentSelects();
-      }
+    if (nombre && !isNaN(precioInput)) {
+        const client = getSupabaseClient();
+        if (client) {
+            const { error } = await client.from('servicios').insert([{ 
+                nombre: nombre, 
+                duracion: duracion, 
+                precio_usd: precioInput, 
+                precio: precioInput 
+            }]);
+            
+            if (error) {
+                alert("Error al guardar servicio: " + error.message);
+            } else {
+                await window.loadServicesTable();
+                await window.populateAppointmentSelects();
+            }
+        }
     }
-  }
 };
 
 window.deleteService = async function(id) {
-  if (!confirm("¿Estás seguro de eliminar este servicio del catálogo?")) return;
+    if (!confirm("¿Estás seguro de eliminar este servicio del catálogo?")) return;
 
-  const client = getSupabaseClient();
-  if (client) {
-    const { error } = await client.from('servicios').delete().eq('id', id);
-    if (error) {
-      alert("Error al eliminar: " + error.message);
-    } else {
-      await window.loadServicesTable();
-      await window.populateAppointmentSelects();
+    const client = getSupabaseClient();
+    if (client) {
+        const { error } = await client.from('servicios').delete().eq('id', id);
+        if (error) {
+            alert("Error al eliminar: " + error.message);
+        } else {
+            await window.loadServicesTable();
+            await window.populateAppointmentSelects();
+        }
     }
-  }
 };
 
 window.loadStaffTable = async function() {
-  const tbody = document.getElementById('staffTableBody');
-  if (!tbody) return;
+    const tbody = document.getElementById('staffTableBody');
+    if (!tbody) return;
 
-  let staffList = [];
-  const client = getSupabaseClient();
-  if (client) {
-    const { data, error } = await client.from('manicuristas').select('*');
-    if (!error) staffList = data || [];
-  }
+    let staffList = [];
+    const client = getSupabaseClient();
+    if (client) {
+        const { data, error } = await client.from('manicuristas').select('*');
+        if (!error) staffList = data || [];
+    }
 
-  if (staffList.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="5" class="p-3 text-center text-slate-400">No hay manicuristas registradas</td></tr>`;
-    return;
-  }
+    if (staffList.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="5" class="p-3 text-center text-slate-400">No hay manicuristas registradas</td></tr>`;
+        return;
+    }
 
-  tbody.innerHTML = staffList.map(stf => `
-    <tr class="border-b border-slate-50">
-      <td class="p-2.5 font-bold text-slate-800">${stf.nombre}</td>
-      <td class="p-2.5 text-slate-600">${stf.especialidad || 'Especialista'}</td>
-      <td class="p-2.5 text-slate-600">${stf.sucursal || 'San Félix'}</td>
-      <td class="p-2.5">
-        <span class="px-2 py-0.5 rounded-full text-[10px] font-bold ${stf.activo !== false ? 'bg-emerald-100 text-emerald-800' : 'bg-gray-100 text-gray-600'}">
-          ${stf.activo !== false ? 'Activo' : 'Inactivo'}
-        </span>
-      </td>
-      <td class="p-2.5 text-center">
-        <button onclick="window.deleteStaff('${stf.id}')" class="text-xs text-red-500 hover:font-bold" title="Eliminar">🗑️</button>
-      </td>
-    </tr>
-  `).join('');
+    tbody.innerHTML = staffList.map(stf => `
+        <tr class="border-b border-slate-50">
+            <td class="p-2.5 font-bold text-slate-800">${stf.nombre}</td>
+            <td class="p-2.5 text-slate-600">${stf.especialidad || 'Especialista'}</td>
+            <td class="p-2.5 text-slate-600">${stf.sucursal || 'San Félix'}</td>
+            <td class="p-2.5">
+                <span class="px-2 py-0.5 rounded-full text-[10px] font-bold ${stf.activo !== false ? 'bg-emerald-100 text-emerald-800' : 'bg-gray-100 text-gray-600'}">
+                    ${stf.activo !== false ? 'Activo' : 'Inactivo'}
+                </span>
+            </td>
+            <td class="p-2.5 text-center">
+                <button onclick="window.deleteStaff('${stf.id}')" class="text-xs text-red-500 hover:font-bold" title="Eliminar">🗑️</button>
+            </td>
+        </tr>
+    `).join('');
 };
 
 window.loadServicesTable = async function() {
-  const tbody = document.getElementById('servicesTableBody');
-  if (!tbody) return;
+    const tbody = document.getElementById('servicesTableBody');
+    if (!tbody) return;
 
-  const currentBcv = getActiveBcvRate();
+    const currentBcv = getActiveBcvRate();
+    let servicesList = [];
+    const client = getSupabaseClient();
 
-  let servicesList = [];
-  const client = getSupabaseClient();
-  if (client) {
-    const { data, error } = await client.from('servicios').select('*');
-    if (!error) servicesList = data || [];
-  }
+    if (client) {
+        const { data, error } = await client.from('servicios').select('*');
+        if (!error) servicesList = data || [];
+    }
 
-  if (servicesList.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="5" class="p-3 text-center text-slate-400">No hay servicios registrados</td></tr>`;
-    return;
-  }
+    if (servicesList.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="5" class="p-3 text-center text-slate-400">No hay servicios registrados</td></tr>`;
+        return;
+    }
 
-  tbody.innerHTML = servicesList.map(srv => {
-    const precioUsd = Number(srv.precio_usd ?? srv.precio ?? 0);
-    const priceBs = (precioUsd * currentBcv).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-    
-    return `
-      <tr class="border-b border-slate-50">
-        <td class="p-2.5 font-bold text-slate-800">${srv.nombre}</td>
-        <td class="p-2.5 text-slate-500">${srv.duracion || 'N/A'}</td>
-        <td class="p-2.5 font-bold text-emerald-700">$${precioUsd.toFixed(2)}</td>
-        <td class="p-2.5 font-bold text-slate-700">Bs. ${priceBs}</td>
-        <td class="p-2.5 text-center">
-          <button onclick="window.deleteService('${srv.id}')" class="text-xs text-red-500 hover:font-bold" title="Eliminar">🗑️</button>
-        </td>
-      </tr>
-    `;
-  }).join('');
+    tbody.innerHTML = servicesList.map(srv => {
+        const precioUsd = Number(srv.precio_usd ?? srv.precio ?? 0);
+        const priceBs = (precioUsd * currentBcv).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        
+        return `
+            <tr class="border-b border-slate-50">
+                <td class="p-2.5 font-bold text-slate-800">${srv.nombre}</td>
+                <td class="p-2.5 text-slate-500">${srv.duracion || 'N/A'}</td>
+                <td class="p-2.5 font-bold text-emerald-700">$${precioUsd.toFixed(2)}</td>
+                <td class="p-2.5 font-bold text-slate-700">Bs. ${priceBs}</td>
+                <td class="p-2.5 text-center">
+                    <button onclick="window.deleteService('${srv.id}')" class="text-xs text-red-500 hover:font-bold" title="Eliminar">🗑️</button>
+                </td>
+            </tr>
+        `;
+    }).join('');
 };
 
-// Carga inicial al estar listo el DOM
+// Carga e inicialización al estar listo el DOM
 document.addEventListener('DOMContentLoaded', () => {
-  setTimeout(() => {
-    if (window.loadAppointmentsFromSupabase) window.loadAppointmentsFromSupabase();
-    if (window.populateAppointmentSelects) window.populateAppointmentSelects();
-    if (window.loadStaffTable) window.loadStaffTable();
-    if (window.loadServicesTable) window.loadServicesTable();
-  }, 500);
+    setTimeout(() => {
+        if (window.loadAppointmentsFromSupabase) window.loadAppointmentsFromSupabase();
+        if (window.populateAppointmentSelects) window.populateAppointmentSelects();
+        if (window.loadStaffTable) window.loadStaffTable();
+        if (window.loadServicesTable) window.loadServicesTable();
+    }, 500);
 });

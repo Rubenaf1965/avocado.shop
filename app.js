@@ -1,3 +1,6 @@
+// ==========================================
+// CONSTANTES, CONFIGURACIÓN Y CLIENTE SUPABASE
+// ==========================================
 window.bcvRate = 36.50;
 
 const branchPasswords = {
@@ -11,11 +14,28 @@ let activeAdminBranch = "ALL";
 let isAdminAuthenticated = false;
 let masterAdminLoggedIn = false;
 let activeModalOrder = null;
-
-// Array temporal para gestionar la carga secuencial desde la galería
 let sequentialBatch = [];
 
-// Helper para convertir archivos a Base64
+// Arrays globales para la aplicación
+window.products = [];
+window.sellers = JSON.parse(localStorage.getItem('avocado_sellers')) || [
+  { id: "s1", name: "María Delgado", branch: "San Félix", sales: 1240.00, commRate: 5 },
+  { id: "s2", name: "Andrea Gómez", branch: "CC Alta Vista I", sales: 850.00, commRate: 5 },
+  { id: "s3", name: "Carla Rivas", branch: "CC Alta Vista II", sales: 410.00, commRate: 5 }
+];
+window.orders = JSON.parse(localStorage.getItem('avocado_orders')) || [];
+window.cart = JSON.parse(localStorage.getItem('avocado_cart')) || [];
+window.appointments = window.appointments || [];
+
+// Helper para obtener el cliente Supabase
+function getSupabaseClient() {
+  const s = window.supabaseClient || window.supabase || window._supabase;
+  if (!s) return null;
+  const client = s.default && typeof s.default.from === 'function' ? s.default : s;
+  return (client && typeof client.from === 'function') ? client : null;
+}
+
+// Convertir archivos a Base64
 function readFileAsBase64(file) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -25,6 +45,26 @@ function readFileAsBase64(file) {
   });
 }
 
+function saveState() {
+  localStorage.setItem('avocado_sellers', JSON.stringify(window.sellers));
+  localStorage.setItem('avocado_orders', JSON.stringify(window.orders));
+}
+
+// ==========================================
+// TASA BCV Y UTILIDADES DE FECHA
+// ==========================================
+function getActiveBcvRate() {
+  if (window.bcvRate && !isNaN(window.bcvRate) && window.bcvRate > 0) {
+    return parseFloat(window.bcvRate);
+  }
+  const bcvBadge = document.getElementById('bcvRateDisplay') || document.querySelector('[id*="bcv"]');
+  if (bcvBadge) {
+    const parsed = parseFloat(bcvBadge.innerText.replace(/[^0-9.]/g, ''));
+    if (!isNaN(parsed) && parsed > 0) return parsed;
+  }
+  return 847.44;
+}
+
 async function fetchLiveBcvRate() {
   const primaryApi = 'https://ve.dolarapi.com/v1/dolares/oficial';
   const fallbackApi = 'https://pydolarvenezuela-api.vercel.app/api/v1/dollar?page=bcv';
@@ -32,7 +72,6 @@ async function fetchLiveBcvRate() {
   try {
     const response = await fetch(primaryApi, { cache: 'no-store' });
     if (!response.ok) throw new Error("Falló API Principal");
-    
     const data = await response.json();
     if (data && data.promedio) {
       window.bcvRate = parseFloat(data.promedio);
@@ -46,7 +85,6 @@ async function fetchLiveBcvRate() {
     try {
       const responseFallback = await fetch(fallbackApi, { cache: 'no-store' });
       if (!responseFallback.ok) throw new Error("Falló API Respaldo");
-
       const dataFallback = await responseFallback.json();
       if (dataFallback && dataFallback.moneda) {
         window.bcvRate = parseFloat(dataFallback.moneda);
@@ -65,140 +103,82 @@ async function fetchLiveBcvRate() {
   if (savedRate) {
     window.bcvRate = parseFloat(savedRate);
   }
-  
   updateBcvUI();
   renderStoreProducts();
   updateCartUI();
 }
 
-let initialProducts = [
-  { id: "1", sku: "RUB-001", name: "Rubber Base Avocado Gel 15ml", category: "Preparadores y Bases", branch: "San Félix", price: 12.00, stock: 25, image: "https://images.unsplash.com/photo-1604654894610-df63bc536371?w=400" },
-  { id: "2", sku: "LAM-080", name: "Lámpara LED UV Sun X5 Plus 80W", category: "Herramientas y Lámparas", branch: "San Félix", price: 35.00, stock: 10, image: "https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?w=400" },
-  { id: "3", sku: "POL-060", name: "Polygel Nude Construction 60g", category: "Sistemas Constructores", branch: "CC Alta Vista I", price: 18.50, stock: 15, image: "https://images.unsplash.com/photo-1632345031435-8727f6897d53?w=400" },
-  { id: "4", sku: "TOP-015", name: "Top Coat No Wipe Ultra Shine", category: "Preparadores y Bases", branch: "CC Alta Vista II", price: 10.00, stock: 0, image: "https://images.unsplash.com/photo-1599948128020-9a44505b0d1b?w=400" }
-];
+function updateBcvUI() {
+  const formattedRate = `Bs. ${window.bcvRate.toFixed(2)}`;
+  const displayDesktop = document.getElementById('bcvRateDisplay');
+  const displayMobile = document.getElementById('bcvRateDisplayMobile');
+  const displayCart = document.getElementById('cartBcvRate');
 
-let initialSellers = [
-  { id: "s1", name: "María Delgado", branch: "San Félix", sales: 1240.00, commRate: 5 },
-  { id: "s2", name: "Andrea Gómez", branch: "CC Alta Vista I", sales: 850.00, commRate: 5 },
-  { id: "s3", name: "Carla Rivas", branch: "CC Alta Vista II", sales: 410.00, commRate: 5 }
-];
-
-let initialOrders = [
-  {
-    orderId: "AVO-849201",
-    clientName: "María Delgado",
-    deliveryType: "Retiro en Sucursal",
-    branch: "San Félix",
-    user: "m.delgado@gmail.com",
-    createdAt: new Date().toISOString(),
-    status: "Procesado",
-    paymentReference: "984102",
-    total: 107.50,
-    items: [
-      { sku: "RUB-001", name: "Rubber Base Avocado Gel 15ml", qty: 2, price: 12.00 },
-      { sku: "LAM-080", name: "Lámpara LED UV Sun X5 Plus 80W", qty: 1, price: 35.00 }
-    ]
-  }
-];
-
-let products = JSON.parse(localStorage.getItem('avocado_products')) || initialProducts;
-let sellers = JSON.parse(localStorage.getItem('avocado_sellers')) || initialSellers;
-let orders = JSON.parse(localStorage.getItem('avocado_orders')) || initialOrders;
-let cart = JSON.parse(localStorage.getItem('avocado_cart')) || [];
-
-function saveState() {
-  localStorage.setItem('avocado_products', JSON.stringify(products));
-  localStorage.setItem('avocado_sellers', JSON.stringify(sellers));
-  localStorage.setItem('avocado_orders', JSON.stringify(orders));
+  if (displayDesktop) displayDesktop.textContent = formattedRate;
+  if (displayMobile) displayMobile.textContent = formattedRate;
+  if (displayCart) displayCart.textContent = `${formattedRate} / USD`;
 }
 
-document.addEventListener('DOMContentLoaded', () => {
-  fetchLiveBcvRate();
-  renderStoreProducts();
-  renderInventoryTable();
-  renderSellersTable();
-  renderOrdersTable();
-  updateCartUI();
-  setupFilters();
-  updateBranchStats();
+function formatToISO(dateStr, timeStr) {
+  try {
+    if (!dateStr) return new Date().toISOString();
+    let cleanedTime = (timeStr || '09:00').trim().toUpperCase();
+    let hours = 9;
+    let minutes = 0;
 
-  document.getElementById('userBranchSelect').addEventListener('change', () => {
-    renderStoreProducts();
-  });
-});
+    const isPM = cleanedTime.includes('PM');
+    const isAM = cleanedTime.includes('AM');
 
-window.switchTab = (tabId) => {
-  if (tabId === 'admin' && !isAdminAuthenticated) {
-    const passwordEntered = prompt("🔑 Ingresa la clave de acceso al Panel Administrativo:");
-    
-    if (passwordEntered === null) return;
+    cleanedTime = cleanedTime.replace(/AM|PM/g, '').trim();
+    const parts = cleanedTime.split(':');
 
-    let authBranch = null;
-    for (const [branchKey, pass] of Object.entries(branchPasswords)) {
-      if (pass === passwordEntered) {
-        authBranch = branchKey;
-        break;
-      }
-    }
+    if (parts.length >= 1) hours = parseInt(parts[0], 10) || 0;
+    if (parts.length >= 2) minutes = parseInt(parts[1], 10) || 0;
 
-    if (authBranch) {
-      isAdminAuthenticated = true;
-      activeAdminBranch = authBranch;
-      masterAdminLoggedIn = (authBranch === "ALL");
+    if (isPM && hours < 12) hours += 12;
+    if (isAM && hours === 12) hours = 0;
 
-      const adminSelect = document.getElementById('adminBranchFilter');
-      adminSelect.value = activeAdminBranch;
-      adminSelect.disabled = !masterAdminLoggedIn;
+    const hStr = String(hours).padStart(2, '0');
+    const mStr = String(minutes).padStart(2, '0');
 
-      document.getElementById('adminHeaderSub').textContent = masterAdminLoggedIn 
-        ? "Control Multi-Sucursal de Inventario, Vendedores y Facturación"
-        : `Panel exclusivo para la Sucursal: ${activeAdminBranch}`;
-
-      filterAdminView();
-    } else {
-      alert("❌ Clave de acceso incorrecta. Acceso denegado.");
-      return;
-    }
+    return `${dateStr}T${hStr}:${mStr}:00+00:00`;
+  } catch (err) {
+    console.error("Error al formatear timestamptz:", err);
+    return `${dateStr}T09:00:00+00:00`;
   }
+}
 
-  document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
-  document.getElementById(`tab-${tabId}`).classList.remove('hidden');
-};
-
-window.logoutAdmin = () => {
-  isAdminAuthenticated = false;
-  activeAdminBranch = "ALL";
-  masterAdminLoggedIn = false;
-  switchTab('store');
-  alert("🔒 Sesión administrativa cerrada.");
-};
-
-window.handleBranchAccessChange = (selectElem) => {
-  if (!masterAdminLoggedIn) return;
-
-  const selectedBranch = selectElem.value;
-  if (selectedBranch === activeAdminBranch) return;
-
-  activeAdminBranch = selectedBranch;
-  filterAdminView();
-};
-
-function renderStoreProducts() {
-  const selectedBranch = document.getElementById('userBranchSelect').value;
+// ==========================================
+// CATÁLOGO Y PRODUCTOS (SUPABASE INTEGRATED)
+// ==========================================
+async function renderStoreProducts() {
+  const selectedBranch = document.getElementById('userBranchSelect')?.value || 'ALL';
   const activeCat = document.querySelector('.cat-filter.active')?.getAttribute('data-cat') || 'all';
-  const searchVal = document.getElementById('searchInput').value.toLowerCase();
+  const searchVal = document.getElementById('searchInput')?.value.toLowerCase() || '';
 
-  let filtered = products;
+  const client = getSupabaseClient();
 
-  if (selectedBranch !== "ALL") {
-    filtered = filtered.filter(p => p.branch === selectedBranch);
+  if (client) {
+    try {
+      let query = client.from('products').select('*');
+      if (selectedBranch !== "ALL") {
+        query = query.eq('branch', selectedBranch);
+      }
+      if (activeCat !== 'all') {
+        query = query.eq('category', activeCat);
+      }
+
+      const { data, error } = await query;
+      if (error) throw error;
+      if (data) {
+        window.products = data;
+      }
+    } catch (err) {
+      console.error("Error consultando Supabase para productos:", err.message);
+    }
   }
 
-  if (activeCat !== 'all') {
-    filtered = filtered.filter(p => p.category === activeCat);
-  }
-
+  let filtered = window.products;
   if (searchVal) {
     filtered = filtered.filter(p => p.name.toLowerCase().includes(searchVal));
   }
@@ -208,6 +188,7 @@ function renderStoreProducts() {
 
 function renderProducts(items) {
   const grid = document.getElementById('productGrid');
+  if (!grid) return;
   if (items.length === 0) {
     grid.innerHTML = `<div class="col-span-full text-center py-12 text-slate-400 font-medium">No se encontraron productos en esta sucursal.</div>`;
     return;
@@ -225,7 +206,7 @@ function renderProducts(items) {
       <div class="bg-white rounded-2xl p-4 border border-gray-100 shadow-sm hover:shadow-md transition relative flex flex-col justify-between">
         <div>
           <div class="relative mb-3">
-            <img src="${p.image}" alt="${p.name}" class="w-full h-44 object-cover rounded-xl ${isOut ? 'grayscale opacity-75' : ''}">
+            <img src="${p.image || 'https://images.unsplash.com/photo-1604654894610-df63bc536371?w=400'}" alt="${p.name}" class="w-full h-44 object-cover rounded-xl ${isOut ? 'grayscale opacity-75' : ''}">
             <div class="absolute top-2 right-2">
               ${stockBadge}
             </div>
@@ -239,7 +220,7 @@ function renderProducts(items) {
 
         <div class="flex items-center justify-between mt-4 pt-2 border-t border-gray-50">
           <div>
-            <span class="text-base font-extrabold text-gray-900">$${p.price.toFixed(2)}</span>
+            <span class="text-base font-extrabold text-gray-900">$${Number(p.price).toFixed(2)}</span>
             <span class="block text-[11px] font-bold text-emerald-700">Bs. ${priceBs}</span>
           </div>
           <button 
@@ -254,182 +235,82 @@ function renderProducts(items) {
   }).join('');
 }
 
-window.addToCart = (id) => {
-  const product = products.find(p => p.id === id);
-  if (!product || product.stock <= 0) return;
-  
-  const existing = cart.find(item => item.id === id);
-  if (existing) {
-    if (existing.qty < product.stock) {
-      existing.qty++;
+window.handleCreateProduct = async (e) => {
+  e.preventDefault();
+
+  const pBranchSelect = document.getElementById('pBranch');
+  const targetBranch = activeAdminBranch !== "ALL" ? activeAdminBranch : pBranchSelect.value;
+  const name = document.getElementById('pName').value;
+  const category = document.getElementById('pCategory').value;
+  const price = parseFloat(document.getElementById('pPrice').value);
+  const stock = parseInt(document.getElementById('pStock').value);
+
+  const client = getSupabaseClient();
+
+  if (sequentialBatch.length > 0) {
+    const productsToInsert = sequentialBatch.map((item, idx) => ({
+      sku: item.sku,
+      name: sequentialBatch.length > 1 ? `${name} (#${idx + 1})` : name,
+      category: category,
+      branch: targetBranch,
+      price: price,
+      stock: stock,
+      image: item.image
+    }));
+
+    if (client) {
+      const { data, error } = await client.from('products').insert(productsToInsert).select();
+      if (error) return alert("Error en Supabase: " + error.message);
+      if (data) window.products.push(...data);
     } else {
-      alert('Límite de stock alcanzado.');
-      return;
+      productsToInsert.forEach(p => { p.id = Date.now().toString(); window.products.push(p); });
     }
-  } else { 
-    cart.push({ ...product, qty: 1 }); 
-  }
-  localStorage.setItem('avocado_cart', JSON.stringify(cart));
-  updateCartUI();
-};
 
-function updateCartUI() {
-  document.getElementById('cartBadge').textContent = cart.reduce((acc, i) => acc + i.qty, 0);
-  const totalUSD = cart.reduce((acc, i) => acc + (i.price * i.qty), 0);
-  const totalBS = totalUSD * window.bcvRate;
+    alert(`✅ Lote de ${sequentialBatch.length} producto(s) guardado(s).`);
+    sequentialBatch = [];
+    document.getElementById('sequentialPreviewContainer').innerHTML = '';
+  } else {
+    const fileInput = document.getElementById('pImage');
+    let imageUrl = "https://images.unsplash.com/photo-1604654894610-df63bc536371?w=400";
 
-  document.getElementById('cartTotalUSD').textContent = `$${totalUSD.toFixed(2)}`;
-  document.getElementById('cartTotalBS').textContent = `Bs. ${totalBS.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-  
-  document.getElementById('cartItems').innerHTML = cart.map(i => {
-    const itemTotalBs = (i.price * i.qty * window.bcvRate).toFixed(2);
-    return `
-      <div class="flex items-center justify-between py-2 border-b text-xs">
-        <div>
-          <p class="font-bold text-gray-800">${i.name}</p>
-          <p class="text-gray-500">$${i.price.toFixed(2)} x ${i.qty}</p>
-        </div>
-        <div class="text-right">
-          <span class="font-bold text-gray-900 block">$${(i.price * i.qty).toFixed(2)}</span>
-          <span class="text-[10px] font-semibold text-emerald-700">Bs. ${itemTotalBs}</span>
-        </div>
-      </div>
-    `;
-  }).join('');
-}
-
-window.cancelPurchase = () => {
-  if (cart.length > 0) {
-    if (!confirm('¿Estás seguro de que deseas cancelar la compra y vaciar el carrito?')) {
-      return;
+    if (fileInput && fileInput.files && fileInput.files[0]) {
+      try {
+        imageUrl = await readFileAsBase64(fileInput.files[0]);
+      } catch (err) {
+        return alert("Error procesando imagen.");
+      }
     }
+
+    const newProduct = {
+      sku: "PROD-00" + (window.products.length + 1),
+      name: name,
+      category: category,
+      branch: targetBranch,
+      price: price,
+      stock: stock,
+      image: imageUrl
+    };
+
+    if (client) {
+      const { data, error } = await client.from('products').insert([newProduct]).select();
+      if (error) return alert("Error en Supabase: " + error.message);
+      if (data && data.length > 0) window.products.push(data[0]);
+    } else {
+      newProduct.id = Date.now().toString();
+      window.products.push(newProduct);
+    }
+    alert("✅ Producto individual guardado con éxito.");
   }
-  cart = [];
-  localStorage.removeItem('avocado_cart');
-  updateCartUI();
-  
-  document.getElementById('buyerName').value = '';
-  document.getElementById('pmReference').value = '';
-  document.getElementById('deliveryAddress').value = '';
-  
-  document.getElementById('cartModal').classList.add('hidden');
-};
 
-window.processCheckout = () => {
-  if (cart.length === 0) return alert('El carrito está vacío.');
-  const buyerName = document.getElementById('buyerName').value.trim();
-  const refNum = document.getElementById('pmReference').value.trim();
-  const deliveryOption = document.getElementById('deliveryOption').value;
-  const deliveryAddress = document.getElementById('deliveryAddress').value.trim();
-  const selectedBranch = document.getElementById('cartBranchSelect').value;
-
-  if (!buyerName) return alert('Por favor ingrese el nombre del comprador.');
-  if (deliveryOption === 'delivery' && !deliveryAddress) return alert('Por favor ingrese la dirección de envío.');
-  if (!refNum) return alert('Por favor ingrese la referencia.');
-
-  const totalUSD = cart.reduce((acc, i) => acc + (i.price * i.qty), 0);
-  const totalBS = totalUSD * window.bcvRate;
-  const orderId = 'AVO-' + Math.floor(100000 + Math.random() * 900000);
-
-  const deliveryTypeLabel = deliveryOption === 'delivery' ? 'Delivery' : 'Retiro en Sucursal';
-  const branchOrAddress = deliveryOption === 'delivery' ? deliveryAddress : selectedBranch;
-
-  const newOrder = {
-    orderId,
-    clientName: buyerName,
-    deliveryType: deliveryTypeLabel,
-    branch: branchOrAddress,
-    user: `${buyerName.toLowerCase().replace(/\s+/g, '')}@cliente.com`,
-    items: [...cart],
-    total: totalUSD,
-    paymentReference: refNum,
-    status: 'En Verificación',
-    createdAt: new Date().toISOString()
-  };
-
-  orders.push(newOrder);
   saveState();
+  renderStoreProducts();
   filterAdminView();
-
-  let msgText = `¡Hola Avocado Shop! Orden #${orderId}\n`;
-  msgText += `Cliente: ${buyerName}\n`;
-  msgText += `Tipo de Entrega: ${deliveryTypeLabel}\n`;
-  if (deliveryOption === 'delivery') {
-    msgText += `Dirección de Envío: ${deliveryAddress}\n`;
-  } else {
-    msgText += `Sucursal de Retiro: ${selectedBranch}\n`;
-  }
-  msgText += `Total USD: $${totalUSD.toFixed(2)}\n`;
-  msgText += `Monto Pago Móvil: Bs. ${totalBS.toFixed(2)} (Tasa BCV: ${window.bcvRate.toFixed(2)})\n`;
-  msgText += `Ref Pago Móvil: ${refNum}`;
-
-  const msg = encodeURIComponent(msgText);
-  window.open(`https://wa.me/584143943252?text=${msg}`, '_blank');
-
-  cart = [];
-  localStorage.removeItem('avocado_cart');
-  updateCartUI();
-  document.getElementById('cartModal').classList.add('hidden');
-  alert(`Pedido #${orderId} registrado.`);
+  document.getElementById('adminProductForm').reset();
+  if (activeAdminBranch !== "ALL") pBranchSelect.value = activeAdminBranch;
 };
-
-window.searchOrderTracking = () => {
-  const code = document.getElementById('trackInput').value.trim();
-  const order = orders.find(o => o.orderId.toLowerCase() === code.toLowerCase());
-  const resultDiv = document.getElementById('trackResult');
-
-  if (order) {
-    document.getElementById('trackClient').textContent = order.clientName;
-    document.getElementById('trackDeliveryType').textContent = order.deliveryType || 'Retiro en Sucursal';
-    document.getElementById('trackBranch').textContent = order.branch;
-    document.getElementById('trackRef').textContent = order.paymentReference;
-    document.getElementById('trackTotal').textContent = `$${order.total.toFixed(2)} (Bs. ${(order.total * window.bcvRate).toFixed(2)})`;
-    document.getElementById('trackStatus').textContent = order.status;
-    
-    document.getElementById('btnDownloadTrackInvoice').onclick = () => window.generateInvoicePDF(order, window.bcvRate);
-    resultDiv.classList.remove('hidden');
-  } else {
-    alert('Código de orden no encontrado.');
-    resultDiv.classList.add('hidden');
-  }
-};
-
-function renderInventoryTable(filterBranch = activeAdminBranch) {
-  const tbody = document.getElementById('inventoryTableBody');
-  const filtered = filterBranch === "ALL" ? products : products.filter(p => p.branch === filterBranch);
-
-  if (filtered.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="8" class="text-center p-4 text-slate-400">No hay productos registrados en esta sucursal.</td></tr>`;
-    return;
-  }
-
-  tbody.innerHTML = filtered.map(p => {
-    const realIdx = products.findIndex(item => item.id === p.id);
-    return `
-      <tr>
-        <td class="p-2.5 font-mono font-bold text-slate-700">${p.sku}</td>
-        <td class="p-2.5 font-medium text-slate-900">${p.name}</td>
-        <td class="p-2.5 text-slate-500">${p.category}</td>
-        <td class="p-2.5 text-slate-500">${p.branch}</td>
-        <td class="p-2.5 font-bold text-slate-800">$${p.price.toFixed(2)}</td>
-        <td class="p-2.5 font-bold ${p.stock <= 0 ? 'text-red-600' : 'text-slate-700'}">${p.stock}</td>
-        <td class="p-2.5">
-          ${p.stock <= 0 
-            ? '<span class="bg-red-50 text-red-700 px-2 py-0.5 rounded text-[10px] font-bold">AGOTADO</span>' 
-            : '<span class="bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded text-[10px] font-bold">Disponible</span>'}
-        </td>
-        <td class="p-2.5 text-center flex justify-center gap-1.5">
-          <button onclick="openEditProductModal(${realIdx})" title="Editar Producto" class="bg-blue-50 text-blue-600 hover:bg-blue-100 px-2 py-1 rounded text-[10px] font-bold">✏️ Editar</button>
-          <button onclick="addStockPrompt(${realIdx})" title="Añadir/Ajustar Stock" class="bg-emerald-50 text-emerald-700 hover:bg-emerald-100 px-2 py-1 rounded text-[10px] font-bold">➕ Stock</button>
-          <button onclick="deleteProduct(${realIdx})" title="Eliminar Producto" class="bg-red-50 text-red-600 hover:bg-red-100 px-2 py-1 rounded text-[10px] font-bold">🗑️</button>
-        </td>
-      </tr>
-    `;
-  }).join('');
-}
 
 window.openEditProductModal = (idx) => {
-  const prod = products[idx];
+  const prod = window.products[idx];
   document.getElementById('editPIdx').value = idx;
   document.getElementById('editPName').value = prod.name;
   document.getElementById('editPCategory').value = prod.category;
@@ -451,105 +332,679 @@ window.closeEditProductModal = () => {
 window.saveEditedProduct = async (e) => {
   e.preventDefault();
   const idx = document.getElementById('editPIdx').value;
-  products[idx].name = document.getElementById('editPName').value;
-  products[idx].category = document.getElementById('editPCategory').value;
-  
-  if (masterAdminLoggedIn) {
-    products[idx].branch = document.getElementById('editPBranch').value;
-  }
+  const prod = window.products[idx];
 
-  products[idx].price = parseFloat(document.getElementById('editPPrice').value);
-  products[idx].stock = parseInt(document.getElementById('editPStock').value);
+  const updatedData = {
+    name: document.getElementById('editPName').value,
+    category: document.getElementById('editPCategory').value,
+    price: parseFloat(document.getElementById('editPPrice').value),
+    stock: parseInt(document.getElementById('editPStock').value)
+  };
+
+  if (masterAdminLoggedIn) {
+    updatedData.branch = document.getElementById('editPBranch').value;
+  }
 
   const fileInput = document.getElementById('editPImage');
   if (fileInput.files && fileInput.files[0]) {
     try {
-      products[idx].image = await readFileAsBase64(fileInput.files[0]);
+      updatedData.image = await readFileAsBase64(fileInput.files[0]);
     } catch (err) {
       alert("Error al cargar la nueva imagen.");
       return;
     }
   }
 
+  const client = getSupabaseClient();
+  if (client && prod.id) {
+    const { error } = await client.from('products').update(updatedData).eq('id', prod.id);
+    if (error) return alert("Error al actualizar en Supabase: " + error.message);
+  }
+
+  Object.assign(window.products[idx], updatedData);
   saveState();
   renderStoreProducts();
   filterAdminView();
   closeEditProductModal();
 };
 
-window.displayInventoryScreen = () => {
-  const filterBranch = activeAdminBranch;
-  const filtered = filterBranch === "ALL" ? products : products.filter(p => p.branch === filterBranch);
-
-  document.getElementById('reportBranchSubtitle').textContent = filterBranch === "ALL" 
-    ? "Sucursales: Todas las Sedes" 
-    : `Sucursal: ${filterBranch}`;
-
-  document.getElementById('reportDate').textContent = new Date().toLocaleDateString('es-VE');
-  document.getElementById('reportBcv').textContent = `Bs. ${window.bcvRate.toFixed(2)}`;
-
-  const tbody = document.getElementById('screenReportBody');
-  tbody.innerHTML = filtered.map(p => `
-    <tr>
-      <td class="p-2 font-mono font-bold">${p.sku}</td>
-      <td class="p-2 font-semibold">${p.name}</td>
-      <td class="p-2 text-gray-500">${p.category}</td>
-      <td class="p-2 text-gray-500">${p.branch}</td>
-      <td class="p-2 text-right font-bold">$${p.price.toFixed(2)}</td>
-      <td class="p-2 text-right text-emerald-700 font-bold">Bs. ${(p.price * window.bcvRate).toFixed(2)}</td>
-      <td class="p-2 text-center font-bold ${p.stock <= 0 ? 'text-red-600' : 'text-gray-800'}">${p.stock}</td>
-    </tr>
-  `).join('');
-
-  document.getElementById('reportTotalItems').textContent = `Total Productos: ${filtered.length}`;
-  document.getElementById('reportTotalStock').textContent = `Unidades Totales: ${filtered.reduce((acc, p) => acc + p.stock, 0)}`;
-
-  document.getElementById('screenReportModal').classList.remove('hidden');
-};
-
-window.closeScreenReport = () => {
-  document.getElementById('screenReportModal').classList.add('hidden');
-};
-
-window.printInventoryReport = () => {
-  if (document.getElementById('screenReportModal').classList.contains('hidden')) {
-    window.displayInventoryScreen();
-  }
-  setTimeout(() => {
-    window.print();
-  }, 300);
-};
-
-window.addStockPrompt = (idx) => {
-  const prod = products[idx];
-  const qtyToAdd = prompt(`Añadir stock a: "${prod.name}" (${prod.branch})\nStock actual: ${prod.stock}\n\nCantidad a sumar:`, "10");
-  if (qtyToAdd === null) return;
-
-  const parsedQty = parseInt(qtyToAdd);
-  if (isNaN(parsedQty) || parsedQty <= 0) {
-    alert("Ingrese una cantidad válida.");
-    return;
-  }
-
-  products[idx].stock += parsedQty;
-  saveState();
-  renderStoreProducts();
-  filterAdminView();
-};
-
-window.deleteProduct = (idx) => {
-  const prod = products[idx];
+window.deleteProduct = async (idx) => {
+  const prod = window.products[idx];
   if (confirm(`¿Eliminar "${prod.name}" de ${prod.branch}?`)) {
-    products.splice(idx, 1);
+    const client = getSupabaseClient();
+    if (client && prod.id) {
+      const { error } = await client.from('products').delete().eq('id', prod.id);
+      if (error) return alert("Error al eliminar en Supabase: " + error.message);
+    }
+    window.products.splice(idx, 1);
     saveState();
     renderStoreProducts();
     filterAdminView();
   }
 };
 
+window.addStockPrompt = async (idx) => {
+  const prod = window.products[idx];
+  const qtyToAdd = prompt(`Añadir stock a: "${prod.name}" (${prod.branch})\nStock actual: ${prod.stock}\n\nCantidad a sumar:`, "10");
+  if (qtyToAdd === null) return;
+
+  const parsedQty = parseInt(qtyToAdd);
+  if (isNaN(parsedQty) || parsedQty <= 0) return alert("Ingrese una cantidad válida.");
+
+  const newStock = prod.stock + parsedQty;
+  const client = getSupabaseClient();
+  if (client && prod.id) {
+    const { error } = await client.from('products').update({ stock: newStock }).eq('id', prod.id);
+    if (error) return alert("Error actualizando stock: " + error.message);
+  }
+
+  window.products[idx].stock = newStock;
+  saveState();
+  renderStoreProducts();
+  filterAdminView();
+};
+
+// ==========================================
+// CARRITO Y PROCESAMIENTO DE COMPRAS
+// ==========================================
+window.addToCart = (id) => {
+  const product = window.products.find(p => p.id === id || p.id == id);
+  if (!product || product.stock <= 0) return;  
+  const existing = window.cart.find(item => item.id === id || item.id == id);
+  if (existing) {
+    if (existing.qty < product.stock) {
+      existing.qty++;
+    } else {
+      return alert('Límite de stock alcanzado.');
+    }
+  } else { 
+    window.cart.push({ ...product, qty: 1 }); 
+  }
+  localStorage.setItem('avocado_cart', JSON.stringify(window.cart));
+  updateCartUI();
+};
+
+function updateCartUI() {
+  const cartBadge = document.getElementById('cartBadge');
+  if (cartBadge) cartBadge.textContent = window.cart.reduce((acc, i) => acc + i.qty, 0);
+
+  const totalUSD = window.cart.reduce((acc, i) => acc + (i.price * i.qty), 0);
+  const totalBS = totalUSD * window.bcvRate;
+
+  const cartTotalUSD = document.getElementById('cartTotalUSD');
+  const cartTotalBS = document.getElementById('cartTotalBS');
+  if (cartTotalUSD) cartTotalUSD.textContent = `$${totalUSD.toFixed(2)}`;
+  if (cartTotalBS) cartTotalBS.textContent = `Bs. ${totalBS.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  
+  const cartItems = document.getElementById('cartItems');
+  if (cartItems) {
+    cartItems.innerHTML = window.cart.map(i => {
+      const itemTotalBs = (i.price * i.qty * window.bcvRate).toFixed(2);
+      return `
+        <div class="flex items-center justify-between py-2 border-b text-xs">
+          <div>
+            <p class="font-bold text-gray-800">${i.name}</p>
+            <p class="text-gray-500">$${Number(i.price).toFixed(2)} x ${i.qty}</p>
+          </div>
+          <div class="text-right">
+            <span class="font-bold text-gray-900 block">$${(i.price * i.qty).toFixed(2)}</span>
+            <span class="text-[10px] font-semibold text-emerald-700">Bs. ${itemTotalBs}</span>
+          </div>
+        </div>
+      `;
+    }).join('');
+  }
+}
+
+window.cancelPurchase = () => {
+  if (window.cart.length > 0) {
+    if (!confirm('¿Estás seguro de que deseas cancelar la compra y vaciar el carrito?')) return;
+  }
+  window.cart = [];
+  localStorage.removeItem('avocado_cart');
+  updateCartUI();
+  
+  if (document.getElementById('buyerName')) document.getElementById('buyerName').value = '';
+  if (document.getElementById('pmReference')) document.getElementById('pmReference').value = '';
+  if (document.getElementById('deliveryAddress')) document.getElementById('deliveryAddress').value = '';
+  
+  document.getElementById('cartModal').classList.add('hidden');
+};
+
+window.processCheckout = () => {
+  if (window.cart.length === 0) return alert('El carrito está vacío.');
+  const buyerName = document.getElementById('buyerName').value.trim();
+  const refNum = document.getElementById('pmReference').value.trim();
+  const deliveryOption = document.getElementById('deliveryOption').value;
+  const deliveryAddress = document.getElementById('deliveryAddress').value.trim();
+  const selectedBranch = document.getElementById('cartBranchSelect').value;
+
+  if (!buyerName) return alert('Por favor ingrese el nombre del comprador.');
+  if (deliveryOption === 'delivery' && !deliveryAddress) return alert('Por favor ingrese la dirección de envío.');
+  if (!refNum) return alert('Por favor ingrese la referencia.');
+
+  const totalUSD = window.cart.reduce((acc, i) => acc + (i.price * i.qty), 0);
+  const totalBS = totalUSD * window.bcvRate;
+  const orderId = 'AVO-' + Math.floor(100000 + Math.random() * 900000);
+
+  const deliveryTypeLabel = deliveryOption === 'delivery' ? 'Delivery' : 'Retiro en Sucursal';
+  const branchOrAddress = deliveryOption === 'delivery' ? deliveryAddress : selectedBranch;
+
+  const newOrder = {
+    orderId,
+    clientName: buyerName,
+    deliveryType: deliveryTypeLabel,
+    branch: branchOrAddress,
+    user: `${buyerName.toLowerCase().replace(/\s+/g, '')}@cliente.com`,
+    items: [...window.cart],
+    total: totalUSD,
+    paymentReference: refNum,
+    status: 'En Verificación',
+    createdAt: new Date().toISOString()
+  };
+
+  window.orders.push(newOrder);
+  saveState();
+  filterAdminView();
+
+  let msgText = `¡Hola Avocado Shop! Orden #${orderId}\n`;
+  msgText += `Cliente: ${buyerName}\n`;
+  msgText += `Tipo de Entrega: ${deliveryTypeLabel}\n`;
+  if (deliveryOption === 'delivery') {
+    msgText += `Dirección de Envío: ${deliveryAddress}\n`;
+  } else {
+    msgText += `Sucursal de Retiro: ${selectedBranch}\n`;
+  }
+  msgText += `Total USD: $${totalUSD.toFixed(2)}\n`;
+  msgText += `Monto Pago Móvil: Bs. ${totalBS.toFixed(2)} (Tasa BCV: ${window.bcvRate.toFixed(2)})\n`;
+  msgText += `Ref Pago Móvil: ${refNum}`;
+
+  window.open(`https://wa.me/584143943252?text=${encodeURIComponent(msgText)}`, '_blank');
+
+  window.cart = [];
+  localStorage.removeItem('avocado_cart');
+  updateCartUI();
+  document.getElementById('cartModal').classList.add('hidden');
+  alert(`Pedido #${orderId} registrado.`);
+};
+
+// ==========================================
+// MÓDULO DE CITAS Y RESERVAS (SUPABASE)
+// ==========================================
+window.populateAppointmentSelects = async function() {
+  const client = getSupabaseClient();
+  if (!client) return;
+
+  const serviceSelect = document.getElementById('appServiceSelect');
+  const staffSelect = document.getElementById('appStaffSelect');
+
+  const { data: serviciosData } = await client.from('servicios').select('*');
+  if (serviceSelect && serviciosData && serviciosData.length > 0) {
+    serviceSelect.innerHTML = '<option value="">Selecciona un servicio</option>' + 
+      serviciosData.map(s => {
+        const precio = Number(s.precio_usd ?? s.precio ?? 0);
+        return `<option value="${s.id}" data-price="${precio}" data-name="${s.nombre}">${s.nombre} ($${precio.toFixed(2)})</option>`;
+      }).join('');
+  }
+
+  const { data: staffData } = await client.from('manicuristas').select('*').eq('activo', true);
+  if (staffSelect && staffData && staffData.length > 0) {
+    staffSelect.innerHTML = '<option value="">Selecciona una especialista</option>' + 
+      staffData.map(m => `<option value="${m.id}" data-name="${m.nombre}">${m.nombre} (${m.sucursal || 'San Félix'})</option>`).join('');
+  }
+};
+
+window.handleCreateAppointment = async (e) => {
+  e.preventDefault();
+
+  const clientName = document.getElementById('appClientName').value.trim();
+  const clientPhone = document.getElementById('appClientPhone').value.trim();
+  const branch = document.getElementById('appBranchSelect').value;
+  const serviceSelectElement = document.getElementById('appServiceSelect');
+  const staffSelectElement = document.getElementById('appStaffSelect');
+  const date = document.getElementById('appDate').value;
+  const time = document.getElementById('appTimeSelect').value;
+
+  if (!clientName || !clientPhone || !date || !time) {
+    alert("Por favor completa todos los campos requeridos.");
+    return;
+  }
+
+  const selectedServiceOption = serviceSelectElement.options[serviceSelectElement.selectedIndex];
+  const serviceName = selectedServiceOption?.dataset?.name || selectedServiceOption?.text.split('(')[0].trim() || 'Servicio General';
+  const servicePrice = parseFloat(selectedServiceOption?.dataset?.price) || 20.00;
+
+  const selectedStaffOption = staffSelectElement.options[staffSelectElement.selectedIndex];
+  const staffNameFinal = selectedStaffOption?.dataset?.name || selectedStaffOption?.text.split('(')[0].trim() || 'Asignación Automática';
+
+  const sucursalEspecialistaFinal = `${branch} (${staffNameFinal})`;
+  const fechaHoraISO = formatToISO(date, time);
+  const client = getSupabaseClient();
+
+  if (client) {
+    try {
+      const { data: existingAppointments, error: checkError } = await client
+        .from('appointments')
+        .select('*')
+        .eq('sucursal_especialista', sucursalEspecialistaFinal);
+
+      if (!checkError && existingAppointments && existingAppointments.length > 0) {
+        const conflicto = existingAppointments.find(app => {
+          const estado = (app.estado || '').toLowerCase();
+          const esActiva = estado !== 'cancelado' && estado !== 'cancelada';
+          const mismaFechaHora = app.fecha_hora === fechaHoraISO || 
+                                app.fecha_hora.includes(`${date}T`) || 
+                                app.fecha_hora.includes(`${date} - ${time}`);
+          return esActiva && mismaFechaHora;
+        });
+
+        if (conflicto) {
+          alert(`⚠️ NO DISPONIBILIDAD\n\nLa especialista ${staffNameFinal} en la sucursal ${branch} ya cuenta con una cita registrada el ${date} a las ${time}.\n\nPor favor, selecciona otro horario o especialista.`);
+          return;
+        }
+      }
+    } catch (err) {
+      console.error('Excepción al validar duplicados:', err);
+    }
+  }
+
+  const appointmentId = 'AVO-CIT-' + Math.floor(1000 + Math.random() * 9000);
+  const currentBcv = getActiveBcvRate();
+  const totalBs = (servicePrice * currentBcv).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+  try {
+    if (client) {
+      const { error: dbError } = await client.from('appointments').insert([{
+        codigo: appointmentId,
+        cliente: clientName,
+        telefono: clientPhone,
+        servicio: serviceName,
+        sucursal_especialista: sucursalEspecialistaFinal,
+        fecha_hora: fechaHoraISO,
+        estado: 'Pendiente'
+      }]);
+      
+      if (dbError) {
+        alert("Hubo un error al guardar la cita en la base de datos: " + dbError.message);
+        return;
+      }
+    }
+  } catch (err) {
+    console.error('Excepción al conectar con Supabase:', err);
+  }
+
+  await loadAppointmentsFromSupabase();
+
+  let msg = `✨ *SOLICITUD DE CITA - AVOCADO SPA* ✨\n\n`;
+  msg += `🆔 *Cita:* #${appointmentId}\n`;
+  msg += `👤 *Cliente:* ${clientName}\n`;
+  msg += `💅 *Servicio:* ${serviceName}\n`;
+  msg += `🏢 *Sucursal:* ${branch}\n`;
+  msg += `👩‍🎨 *Especialista:* ${staffNameFinal}\n`;
+  msg += `📅 *Fecha:* ${date}\n`;
+  msg += `⏰ *Hora:* ${time}\n`;
+  msg += `💰 *Total:* $${servicePrice.toFixed(2)} (Bs. ${totalBs})\n\n`;
+  msg += `_Quedo a la espera de la confirmación de la cita._`;
+
+  window.open(`https://wa.me/584143943252?text=${encodeURIComponent(msg)}`, '_blank');
+
+  const formEl = document.getElementById('appointmentForm') || document.querySelector('form');
+  if (formEl) formEl.reset();
+  alert(`✅ Tu solicitud de cita #${appointmentId} ha sido enviada con éxito.`);
+};
+
+async function loadAppointmentsFromSupabase() {
+  const client = getSupabaseClient();
+  if (!client) {
+    setTimeout(loadAppointmentsFromSupabase, 800);
+    return;
+  }
+  
+  const { data, error } = await client.from('appointments').select('*');
+  if (error) return console.error('Error al cargar citas de Supabase:', error.message);
+
+  if (data && data.length > 0) {
+    window.appointments = data.map(item => ({
+      id: item.id,
+      appointmentId: item.codigo || item.code || 'N/A',
+      clientName: item.cliente || item.client_name || 'Sin nombre',
+      clientPhone: item.telefono || item.client_phone || '',
+      serviceName: item.servicio || 'Servicio General',
+      staffName: item.sucursal_especialista || 'Asignación Automática',
+      dateTime: item.fecha_hora || 'Por definir',
+      status: item.estado || 'Pendiente'
+    }));
+  } else {
+    window.appointments = [];
+  }
+  
+  renderAppointmentsTableSafe();
+}
+
+window.updateAppointmentStatus = async (appointmentId, newStatus) => {
+  const client = getSupabaseClient();
+  const app = window.appointments.find(a => a.appointmentId === appointmentId || a.id == appointmentId);
+  
+  if (client && app) {
+    const queryField = app.id ? 'id' : 'codigo';
+    const queryValue = app.id || app.appointmentId;
+
+    const { error } = await client
+      .from('appointments')
+      .update({ estado: newStatus })
+      .eq(queryField, queryValue);
+
+    if (error) return alert('No se pudo actualizar el estado en la base de datos.');
+  }
+  await loadAppointmentsFromSupabase();
+};
+
+window.deleteAppointment = async (appointmentId) => {
+  if (!confirm(`¿Estás seguro de eliminar la cita #${appointmentId}?`)) return;
+  const client = getSupabaseClient();
+  const app = window.appointments.find(a => a.appointmentId === appointmentId || a.id == appointmentId);
+
+  if (client && app) {
+    const queryField = app.id ? 'id' : 'codigo';
+    const queryValue = app.id || app.appointmentId;
+
+    const { error } = await client
+      .from('appointments')
+      .delete()
+      .eq(queryField, queryValue);
+
+    if (error) return alert('No se pudo eliminar la cita de la base de datos.');
+  }
+  await loadAppointmentsFromSupabase();
+};
+
+function renderAppointmentsTableSafe() {
+  const tbody = document.getElementById('appointmentsTableBody');
+  if (!tbody) return;
+
+  if (!window.appointments || window.appointments.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="7" class="text-center p-4 text-slate-400 text-xs">No hay citas registradas en la base de datos.</td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = window.appointments.map(app => `
+    <tr class="border-b text-xs text-slate-700 hover:bg-slate-50 transition">
+      <td class="p-2.5 font-bold">${app.appointmentId}</td>
+      <td class="p-2.5"><strong>${app.clientName}</strong><br><span class="text-[11px] text-slate-400">${app.clientPhone}</span></td>
+      <td class="p-2.5">${app.serviceName}</td>
+      <td class="p-2.5">${app.staffName}</td>
+      <td class="p-2.5">${app.dateTime}</td>
+      <td class="p-2.5">
+        <select onchange="updateAppointmentStatus('${app.appointmentId}', this.value)" class="text-xs font-bold rounded-lg p-1 outline-none border cursor-pointer ${
+          app.status === 'Verificado' || app.status === 'Confirmada' ? 'bg-emerald-100 text-emerald-800 border-emerald-300' :
+          app.status === 'En Verificación' || app.status === 'Pendiente' ? 'bg-amber-100 text-amber-800 border-amber-300' :
+          'bg-red-100 text-red-800 border-red-300'
+        }">
+          <option value="Pendiente" ${app.status === 'Pendiente' ? 'selected' : ''}>Pendiente</option>
+          <option value="En Verificación" ${app.status === 'En Verificación' ? 'selected' : ''}>En Verificación</option>
+          <option value="Verificado" ${app.status === 'Verificado' ? 'selected' : ''}>Verificado</option>
+          <option value="Cancelado" ${app.status === 'Cancelado' ? 'selected' : ''}>Cancelado</option>
+        </select>
+      </td>
+      <td class="p-2.5 text-center">
+        <button onclick="deleteAppointment('${app.appointmentId}')" title="Eliminar Cita" class="bg-red-50 text-red-600 hover:bg-red-100 px-2.5 py-1 rounded-md text-xs font-bold transition">🗑️</button>
+      </td>
+    </tr>
+  `).join('');
+}
+
+// ==========================================
+// GESTIÓN DE MANICURISTAS Y SERVICIOS
+// ==========================================
+window.addStaffPrompt = async function() {
+  const nombre = prompt("Nombre y Apellido de la manicurista:");
+  if (!nombre) return;
+  const sucursal = prompt("Sucursal (San Félix, CC Alta Vista I, CC Alta Vista II):", "San Félix");
+
+  const client = getSupabaseClient();
+  if (client) {
+    const { error } = await client.from('manicuristas').insert([{ nombre, sucursal, activo: true }]);
+    if (error) {
+      alert("Error al guardar en Supabase: " + error.message);
+    } else {
+      await window.loadStaffTable();
+      await window.populateAppointmentSelects();
+    }
+  }
+};
+
+window.deleteStaff = async function(id) {
+  if (!confirm("¿Estás seguro de eliminar esta manicurista?")) return;
+  const client = getSupabaseClient();
+  if (client) {
+    const { error } = await client.from('manicuristas').delete().eq('id', id);
+    if (error) {
+      alert("Error al eliminar: " + error.message);
+    } else {
+      await window.loadStaffTable();
+      await window.populateAppointmentSelects();
+    }
+  }
+};
+
+window.addServicePrompt = async function() {
+  const nombre = prompt("Nombre del Servicio (ej. Pedicura Spa + Semipermanente):");
+  if (!nombre) return;
+  const duracion = prompt("Duración estimada (ej. 45 min, 1h 30m):", "1 hora");
+  const precioInput = parseFloat(prompt("Precio en USD ($):", "20.00"));
+
+  if (nombre && !isNaN(precioInput)) {
+    const client = getSupabaseClient();
+    if (client) {
+      const { error } = await client.from('servicios').insert([{ 
+        nombre: nombre, 
+        duracion: duracion, 
+        precio_usd: precioInput, 
+        precio: precioInput 
+      }]);
+      
+      if (error) {
+        alert("Error al guardar servicio: " + error.message);
+      } else {
+        await window.loadServicesTable();
+        await window.populateAppointmentSelects();
+      }
+    }
+  }
+};
+
+window.deleteService = async function(id) {
+  if (!confirm("¿Estás seguro de eliminar este servicio del catálogo?")) return;
+  const client = getSupabaseClient();
+  if (client) {
+    const { error } = await client.from('servicios').delete().eq('id', id);
+    if (error) {
+      alert("Error al eliminar: " + error.message);
+    } else {
+      await window.loadServicesTable();
+      await window.populateAppointmentSelects();
+    }
+  }
+};
+
+window.loadStaffTable = async function() {
+  const tbody = document.getElementById('staffTableBody');
+  if (!tbody) return;
+
+  let staffList = [];
+  const client = getSupabaseClient();
+  if (client) {
+    const { data, error } = await client.from('manicuristas').select('*');
+    if (!error) staffList = data || [];
+  }
+
+  if (staffList.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="5" class="p-3 text-center text-slate-400">No hay manicuristas registradas</td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = staffList.map(stf => `
+    <tr class="border-b border-slate-50">
+      <td class="p-2.5 font-bold text-slate-800">${stf.nombre}</td>
+      <td class="p-2.5 text-slate-600">${stf.especialidad || 'Especialista'}</td>
+      <td class="p-2.5 text-slate-600">${stf.sucursal || 'San Félix'}</td>
+      <td class="p-2.5">
+        <span class="px-2 py-0.5 rounded-full text-[10px] font-bold ${stf.activo !== false ? 'bg-emerald-100 text-emerald-800' : 'bg-gray-100 text-gray-600'}">
+          ${stf.activo !== false ? 'Activo' : 'Inactivo'}
+        </span>
+      </td>
+      <td class="p-2.5 text-center">
+        <button onclick="window.deleteStaff('${stf.id}')" class="text-xs text-red-500 hover:font-bold" title="Eliminar">🗑️</button>
+      </td>
+    </tr>
+  `).join('');
+};
+
+window.loadServicesTable = async function() {
+  const tbody = document.getElementById('servicesTableBody');
+  if (!tbody) return;
+
+  const currentBcv = getActiveBcvRate();
+  let servicesList = [];
+  const client = getSupabaseClient();
+  if (client) {
+    const { data, error } = await client.from('servicios').select('*');
+    if (!error) servicesList = data || [];
+  }
+
+  if (servicesList.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="5" class="p-3 text-center text-slate-400">No hay servicios registrados</td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = servicesList.map(srv => {
+    const precioUsd = Number(srv.precio_usd ?? srv.precio ?? 0);
+    const priceBs = (precioUsd * currentBcv).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    
+    return `
+      <tr class="border-b border-slate-50">
+        <td class="p-2.5 font-bold text-slate-800">${srv.nombre}</td>
+        <td class="p-2.5 text-slate-500">${srv.duracion || 'N/A'}</td>
+        <td class="p-2.5 font-bold text-emerald-700">$${precioUsd.toFixed(2)}</td>
+        <td class="p-2.5 font-bold text-slate-700">Bs. ${priceBs}</td>
+        <td class="p-2.5 text-center">
+          <button onclick="window.deleteService('${srv.id}')" class="text-xs text-red-500 hover:font-bold" title="Eliminar">🗑️</button>
+        </td>
+      </tr>
+    `;
+  }).join('');
+};
+
+// ==========================================
+// VISTAS DE ADMINISTRACIÓN Y REPORTES
+// ==========================================
+window.switchTab = (tabId) => {
+  if (tabId === 'admin' && !isAdminAuthenticated) {
+    const passwordEntered = prompt("🔑 Ingresa la clave de acceso al Panel Administrativo:");
+    if (passwordEntered === null) return;
+
+    let authBranch = null;
+    for (const [branchKey, pass] of Object.entries(branchPasswords)) {
+      if (pass === passwordEntered) {
+        authBranch = branchKey;
+        break;
+      }
+    }
+
+    if (authBranch) {
+      isAdminAuthenticated = true;
+      activeAdminBranch = authBranch;
+      masterAdminLoggedIn = (authBranch === "ALL");
+
+      const adminSelect = document.getElementById('adminBranchFilter');
+      if (adminSelect) {
+        adminSelect.value = activeAdminBranch;
+        adminSelect.disabled = !masterAdminLoggedIn;
+      }
+
+      const adminHeaderSub = document.getElementById('adminHeaderSub');
+      if (adminHeaderSub) {
+        adminHeaderSub.textContent = masterAdminLoggedIn 
+          ? "Control Multi-Sucursal de Inventario, Vendedores y Facturación"
+          : `Panel exclusivo para la Sucursal: ${activeAdminBranch}`;
+      }
+
+      filterAdminView();
+    } else {
+      alert("❌ Clave de acceso incorrecta. Acceso denegado.");
+      return;
+    }
+  }
+
+  document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+  const targetTab = document.getElementById(`tab-${tabId}`);
+  if (targetTab) targetTab.classList.remove('hidden');
+};
+
+window.logoutAdmin = () => {
+  isAdminAuthenticated = false;
+  activeAdminBranch = "ALL";
+  masterAdminLoggedIn = false;
+  switchTab('store');
+  alert("🔒 Sesión administrativa cerrada.");
+};
+
+window.filterAdminView = () => {
+  renderInventoryTable(activeAdminBranch);
+  renderOrdersTable(activeAdminBranch);
+  renderSellersTable(activeAdminBranch);
+  updateBranchStats();
+
+  const pBranchSelect = document.getElementById('pBranch');
+  if (pBranchSelect) {
+    if (activeAdminBranch !== "ALL") {
+      pBranchSelect.value = activeAdminBranch;
+      pBranchSelect.disabled = true;
+    } else {
+      pBranchSelect.disabled = false;
+    }
+  }
+};
+
+function renderInventoryTable(filterBranch = activeAdminBranch) {
+  const tbody = document.getElementById('inventoryTableBody');
+  if (!tbody) return;
+  const filtered = filterBranch === "ALL" ? window.products : window.products.filter(p => p.branch === filterBranch);
+
+  if (filtered.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="8" class="text-center p-4 text-slate-400">No hay productos registrados en esta sucursal.</td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = filtered.map(p => {
+    const realIdx = window.products.findIndex(item => item.id === p.id);
+    return `
+      <tr>
+        <td class="p-2.5 font-mono font-bold text-slate-700">${p.sku}</td>
+        <td class="p-2.5 font-medium text-slate-900">${p.name}</td>
+        <td class="p-2.5 text-slate-500">${p.category}</td>
+        <td class="p-2.5 text-slate-500">${p.branch}</td>
+        <td class="p-2.5 font-bold text-slate-800">$${Number(p.price).toFixed(2)}</td>
+        <td class="p-2.5 font-bold ${p.stock <= 0 ? 'text-red-600' : 'text-slate-700'}">${p.stock}</td>
+        <td class="p-2.5">
+          ${p.stock <= 0 
+            ? '<span class="bg-red-50 text-red-700 px-2 py-0.5 rounded text-[10px] font-bold">AGOTADO</span>' 
+            : '<span class="bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded text-[10px] font-bold">Disponible</span>'}
+        </td>
+        <td class="p-2.5 text-center flex justify-center gap-1.5">
+          <button onclick="openEditProductModal(${realIdx})" title="Editar Producto" class="bg-blue-50 text-blue-600 hover:bg-blue-100 px-2 py-1 rounded text-[10px] font-bold">✏️ Editar</button>
+          <button onclick="addStockPrompt(${realIdx})" title="Añadir/Ajustar Stock" class="bg-emerald-50 text-emerald-700 hover:bg-emerald-100 px-2 py-1 rounded text-[10px] font-bold">➕ Stock</button>
+          <button onclick="deleteProduct(${realIdx})" title="Eliminar Producto" class="bg-red-50 text-red-600 hover:bg-red-100 px-2 py-1 rounded text-[10px] font-bold">🗑️</button>
+        </td>
+      </tr>
+    `;
+  }).join('');
+}
+
 function renderSellersTable(filterBranch = activeAdminBranch) {
   const tbody = document.getElementById('sellersTableBody');
-  const filtered = filterBranch === "ALL" ? sellers : sellers.filter(s => s.branch === filterBranch);
+  if (!tbody) return;
+  const filtered = filterBranch === "ALL" ? window.sellers : window.sellers.filter(s => s.branch === filterBranch);
 
   if (filtered.length === 0) {
     tbody.innerHTML = `<tr><td colspan="6" class="text-center p-4 text-slate-400">No hay vendedores registrados en esta sucursal.</td></tr>`;
@@ -557,7 +1012,7 @@ function renderSellersTable(filterBranch = activeAdminBranch) {
   }
 
   tbody.innerHTML = filtered.map((s) => {
-    const realIndex = sellers.findIndex(item => item.id === s.id);
+    const realIndex = window.sellers.findIndex(item => item.id === s.id);
     return `
       <tr>
         <td class="p-2.5 font-medium text-slate-800">${s.name}</td>
@@ -574,59 +1029,10 @@ function renderSellersTable(filterBranch = activeAdminBranch) {
   }).join('');
 }
 
-window.openEditSellerModal = (idx) => {
-  const seller = sellers[idx];
-  document.getElementById('editSIdx').value = idx;
-  document.getElementById('editSName').value = seller.name;
-  
-  const branchSelect = document.getElementById('editSBranch');
-  branchSelect.value = seller.branch;
-  branchSelect.disabled = !masterAdminLoggedIn;
-
-  document.getElementById('editSSales').value = seller.sales;
-  document.getElementById('editSCommRate').value = seller.commRate;
-  document.getElementById('editSellerModal').classList.remove('hidden');
-};
-
-window.closeEditSellerModal = () => {
-  document.getElementById('editSellerModal').classList.add('hidden');
-};
-
-window.saveEditedSeller = (e) => {
-  e.preventDefault();
-  const idx = document.getElementById('editSIdx').value;
-  sellers[idx].name = document.getElementById('editSName').value;
-  
-  if (masterAdminLoggedIn) {
-    sellers[idx].branch = document.getElementById('editSBranch').value;
-  }
-
-  sellers[idx].sales = parseFloat(document.getElementById('editSSales').value);
-  sellers[idx].commRate = parseFloat(document.getElementById('editSCommRate').value);
-
-  saveState();
-  filterAdminView();
-  closeEditSellerModal();
-};
-
-function getStatusBadgeClass(status) {
-  switch (status) {
-    case 'Procesado':
-    case 'Entregado':
-      return 'bg-emerald-100 text-emerald-800 border border-emerald-200';
-    case 'Cancelado':
-    case 'Rechazado':
-      return 'bg-red-100 text-red-800 border border-red-200';
-    case 'En Verificación':
-    case 'Pendiente':
-    default:
-      return 'bg-amber-100 text-amber-800 border border-amber-200';
-  }
-}
-
 function renderOrdersTable(filterBranch = activeAdminBranch) {
   const tbody = document.getElementById('ordersTableBody');
-  const filtered = filterBranch === "ALL" ? orders : orders.filter(o => o.branch === filterBranch);
+  if (!tbody) return;
+  const filtered = filterBranch === "ALL" ? window.orders : window.orders.filter(o => o.branch === filterBranch);
 
   if (filtered.length === 0) {
     tbody.innerHTML = `<tr><td colspan="7" class="text-center p-4 text-slate-400">No hay órdenes registradas para esta sucursal.</td></tr>`;
@@ -634,7 +1040,7 @@ function renderOrdersTable(filterBranch = activeAdminBranch) {
   }
 
   tbody.innerHTML = filtered.map(o => {
-    const realIndex = orders.findIndex(item => item.orderId === o.orderId);
+    const realIndex = window.orders.findIndex(item => item.orderId === o.orderId);
     const isGlobalAccess = activeAdminBranch === "ALL";
     const currentStatus = o.status || 'En Verificación';
     const badgeClass = getStatusBadgeClass(currentStatus);
@@ -665,91 +1071,26 @@ function renderOrdersTable(filterBranch = activeAdminBranch) {
   }).join('');
 }
 
-window.changeOrderStatus = (idx, newStatus) => {
-  orders[idx].status = newStatus;
-  saveState();
-  filterAdminView();
-};
-
-window.viewOrderModal = (orderId) => {
-  const order = orders.find(o => o.orderId === orderId);
-  if (!order) return alert('Orden no encontrada.');
-
-  activeModalOrder = order;
-
-  const dateObj = order.createdAt ? new Date(order.createdAt) : new Date();
-  const formattedDate = dateObj.toLocaleDateString('es-VE', { year: 'numeric', month: '2-digit', day: '2-digit' });
-  const totalBs = order.total * window.bcvRate;
-
-  document.getElementById('orderModalSubtitle').textContent = `Orden N° ${order.orderId} • Cliente: ${order.clientName}`;
-  document.getElementById('modalOrderId').textContent = `N° ${order.orderId}`;
-  document.getElementById('modalOrderDate').textContent = `Fecha: ${formattedDate}`;
-
-  document.getElementById('modalClientName').textContent = order.clientName;
-  document.getElementById('modalClientEmail').textContent = order.user || 'cliente@avocadoshop.com';
-
-  document.getElementById('modalDeliveryType').textContent = order.deliveryType || 'Retiro en Sucursal';
-  document.getElementById('modalBranch').textContent = order.branch || 'Sucursal Principal';
-
-  document.getElementById('modalPaymentRef').textContent = `#${order.paymentReference}`;
-  document.getElementById('modalBcvRate').textContent = `Bs. ${window.bcvRate.toFixed(2)} / USD`;
-  document.getElementById('modalTotalBs').textContent = `Bs. ${totalBs.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-  document.getElementById('modalStatus').textContent = order.status || 'En Verificación';
-
-  document.getElementById('modalTotalUsd').textContent = `$${order.total.toFixed(2)}`;
-  document.getElementById('modalTotalBsSummary').textContent = `Bs. ${totalBs.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-
-  const tbody = document.getElementById('modalOrderItemsBody');
-  tbody.innerHTML = (order.items || []).map(item => {
-    const itemTotal = (item.price * item.qty).toFixed(2);
-    return `
-      <tr>
-        <td class="p-2.5 font-mono font-bold text-slate-700">${item.sku || 'PROD'}</td>
-        <td class="p-2.5 font-medium text-slate-900">${item.name}</td>
-        <td class="p-2.5 text-center font-bold text-slate-800">${item.qty}</td>
-        <td class="p-2.5 text-right font-medium text-slate-700">$${item.price.toFixed(2)}</td>
-        <td class="p-2.5 text-right font-bold text-emerald-700">$${itemTotal}</td>
-      </tr>
-    `;
-  }).join('');
-
-  document.getElementById('btnDownloadInvoiceFromModal').onclick = () => {
-    window.generateInvoicePDF(order, window.bcvRate);
-  };
-
-  document.getElementById('viewOrderModal').classList.remove('hidden');
-};
-
-window.closeOrderModal = () => {
-  document.getElementById('viewOrderModal').classList.add('hidden');
-  activeModalOrder = null;
-};
-
-window.printOrderInvoice = () => {
-  window.print();
-};
-
-window.deleteOrder = (idx) => {
-  if (activeAdminBranch !== "ALL") {
-    alert("Acción no permitida. Solo el acceso global puede eliminar órdenes.");
-    return;
+function getStatusBadgeClass(status) {
+  switch (status) {
+    case 'Procesado':
+    case 'Entregado':
+      return 'bg-emerald-100 text-emerald-800 border border-emerald-200';
+    case 'Cancelado':
+    case 'Rechazado':
+      return 'bg-red-100 text-red-800 border border-red-200';
+    default:
+      return 'bg-amber-100 text-amber-800 border border-amber-200';
   }
-
-  const order = orders[idx];
-  if (confirm(`¿Estás seguro de que deseas eliminar la orden "${order.orderId}" de ${order.clientName}?`)) {
-    orders.splice(idx, 1);
-    saveState();
-    filterAdminView();
-  }
-};
+}
 
 function updateBranchStats() {
   const branches = ["San Félix", "CC Alta Vista I", "CC Alta Vista II"];
   const ids = ["sanfelix", "altavista1", "altavista2"];
 
   branches.forEach((b, index) => {
-    const branchSales = sellers.filter(s => s.branch === b).reduce((acc, s) => acc + s.sales, 0);
-    const branchStock = products.filter(p => p.branch === b).reduce((acc, p) => acc + p.stock, 0);
+    const branchSales = window.sellers.filter(s => s.branch === b).reduce((acc, s) => acc + s.sales, 0);
+    const branchStock = window.products.filter(p => p.branch === b).reduce((acc, p) => acc + p.stock, 0);
 
     const statElem = document.getElementById(`stat-${ids[index]}`);
     const stockElem = document.getElementById(`stock-${ids[index]}`);
@@ -758,13 +1099,12 @@ function updateBranchStats() {
     if (stockElem) stockElem.textContent = `Stock: ${branchStock} unidades`;
   });
 
-  const deliveryOrders = orders.filter(o => 
+  const deliveryOrders = window.orders.filter(o => 
     (o.deliveryType === "Delivery" || o.deliveryType === "Envío por Delivery") &&
     o.status !== "Cancelado"
   );
   
   const totalDeliverySales = deliveryOrders.reduce((acc, o) => acc + (o.total || 0), 0);
-
   const statDeliveryElem = document.getElementById('stat-delivery');
   const countDeliveryElem = document.getElementById('count-delivery');
 
@@ -772,262 +1112,14 @@ function updateBranchStats() {
   if (countDeliveryElem) countDeliveryElem.textContent = `${deliveryOrders.length} pedido(s) registrado(s)`;
 }
 
-window.addSellerPrompt = () => {
-  const name = prompt("Nombre del vendedor:");
-  if (!name || name.trim() === "") return;
-
-  const targetBranch = activeAdminBranch !== "ALL" ? activeAdminBranch : prompt("Sucursal asignada:", "San Félix");
-  if (!targetBranch) return;
-
-  const commRate = prompt("Comisión (%):", "5");
-  const parsedRate = parseFloat(commRate);
-
-  if (isNaN(parsedRate) || parsedRate < 0) return alert("Porcentaje no válido.");
-
-  sellers.push({
-    id: "s" + (sellers.length + 1),
-    name: name.trim(),
-    branch: targetBranch.trim(),
-    sales: 0.00,
-    commRate: parsedRate
-  });
-
-  saveState();
-  filterAdminView();
-};
-
-window.deleteSeller = (idx) => {
-  if (confirm(`¿Eliminar a ${sellers[idx].name}?`)) {
-    sellers.splice(idx, 1);
-    saveState();
-    filterAdminView();
-  }
-};
-
-window.filterAdminView = () => {
-  renderInventoryTable(activeAdminBranch);
-  renderOrdersTable(activeAdminBranch);
-  renderSellersTable(activeAdminBranch);
-  updateBranchStats();
-
-  const pBranchSelect = document.getElementById('pBranch');
-  if (activeAdminBranch !== "ALL") {
-    pBranchSelect.value = activeAdminBranch;
-    pBranchSelect.disabled = true;
-  } else {
-    pBranchSelect.disabled = false;
-  }
-};
-
-// OPCIÓN A: PROCESAR SELECCIÓN DESDE GALERÍA DE MANERA SECUENCIAL
-window.handleSequentialFilesSelect = async (event) => {
-  const files = Array.from(event.target.files);
-  if (!files.length) return;
-
-  const previewContainer = document.getElementById('sequentialPreviewContainer');
-  previewContainer.innerHTML = '';
-  sequentialBatch = [];
-
-  for (let i = 0; i < files.length; i++) {
-    const file = files[i];
-    try {
-      const base64Img = await readFileAsBase64(file);
-      sequentialBatch.push({
-        id: (products.length + i + 1).toString(),
-        sku: `PROD-00${products.length + i + 1}`,
-        image: base64Img,
-        fileName: file.name
-      });
-
-      // Insertar elemento en la UI del lote
-      const card = document.createElement('div');
-      card.className = "flex items-center gap-3 p-2 bg-slate-50 border rounded-xl text-xs";
-      card.innerHTML = `
-        <span class="font-bold text-slate-400">#${i + 1}</span>
-        <img src="${base64Img}" class="w-10 h-10 object-cover rounded-lg border">
-        <div class="flex-1 min-w-0">
-          <p class="font-semibold text-slate-700 truncate">${file.name}</p>
-          <span class="text-[10px] bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded font-mono">
-            SKU Asignado: PROD-00${products.length + i + 1}
-          </span>
-        </div>
-      `;
-      previewContainer.appendChild(card);
-    } catch (err) {
-      console.error("Error al leer archivo de galería:", err);
-    }
-  }
-};
-
-// OPCIÓN A: REGISTRO SECUENCIAL DE LOTES O PRODUCTO INDIVIDUAL
-window.handleCreateProduct = async (event) => {
-  event.preventDefault();
-
-  const name = document.getElementById('newProductName').value.trim();
-  const sku = document.getElementById('newProductSku').value.trim();
-  const category = document.getElementById('newProductCategory').value;
-  const branch = masterAdminLoggedIn ? document.getElementById('newProductBranch').value : activeAdminBranch;
-  const price = parseFloat(document.getElementById('newProductPrice').value);
-  const stock = parseInt(document.getElementById('newProductStock').value);
-  
-  const fileInput = document.getElementById('newProductImage');
-  let imageUrl = "https://images.unsplash.com/photo-1604654894610-df63bc536371?w=400"; // Imagen por defecto
-
-  if (fileInput && fileInput.files && fileInput.files[0]) {
-    try {
-      imageUrl = await readFileAsBase64(fileInput.files[0]);
-    } catch (err) {
-      console.error("Error al procesar la imagen", err);
-    }
-  }
-
-  const newProduct = {
-    id: 'prod-' + Date.now(),
-    sku: sku || ('PROD-' + Math.floor(100 + Math.random() * 900)),
-    name,
-    category,
-    branch,
-    price,
-    stock,
-    image: imageUrl
-  };
-
-  // Añadir al array global
-  products.push(newProduct);
-
-  // Guardar estado en localStorage
-  saveState();
-
-  // Actualizar la interfaz de inmediato
-  renderStoreProducts();
-  filterAdminView();
-  updateBranchStats();
-
-  // Limpiar formulario y cerrar modal si aplica
-  event.target.reset();
-  alert(`¡Producto "${name}" agregado con éxito!`);
-};
-
-window.handleCreateProduct = async (e) => {
-  e.preventDefault();
-
-  const pBranchSelect = document.getElementById('pBranch');
-  const targetBranch = activeAdminBranch !== "ALL" ? activeAdminBranch : pBranchSelect.value;
-  
-  const name = document.getElementById('pName').value;
-  const category = document.getElementById('pCategory').value;
-  const price = parseFloat(document.getElementById('pPrice').value);
-  const stock = parseInt(document.getElementById('pStock').value);
-
-  // Si hay un lote cargado secuencialmente desde la galería
-  if (sequentialBatch.length > 0) {
-    sequentialBatch.forEach((item, idx) => {
-      products.push({
-        id: item.id,
-        sku: item.sku,
-        name: sequentialBatch.length > 1 ? `${name} (#${idx + 1})` : name,
-        category: category,
-        branch: targetBranch,
-        price: price,
-        stock: stock,
-        image: item.image
-      });
-    });
-
-    alert(`✅ Lote secuencial de ${sequentialBatch.length} producto(s) agregado(s) con éxito.`);
-    sequentialBatch = [];
-    document.getElementById('sequentialPreviewContainer').innerHTML = '';
-  } else {
-    // Registro individual convencional de la galería
-    const fileInput = document.getElementById('pImage');
-    if (!fileInput.files || !fileInput.files[0]) {
-      alert("Por favor, selecciona al menos una imagen desde tu galería.");
-      return;
-    }
-
-    try {
-      const base64Image = await readFileAsBase64(fileInput.files[0]);
-      const newP = {
-        id: (products.length + 1).toString(),
-        sku: "PROD-00" + (products.length + 1),
-        name: name,
-        category: category,
-        branch: targetBranch,
-        price: price,
-        stock: stock,
-        image: base64Image
-      };
-
-      products.push(newP);
-      alert("✅ Producto individual guardado con éxito.");
-    } catch (error) {
-      alert("Error procesando la imagen. Inténtalo de nuevo.");
-      return;
-    }
-  }
-
-  saveState();
-  renderStoreProducts();
-  filterAdminView();
-  document.getElementById('adminProductForm').reset();
-
-  if (activeAdminBranch !== "ALL") {
-    pBranchSelect.value = activeAdminBranch;
-  }
-};
-
-window.exportDataJSON = () => {
-  const backupData = {
-    products,
-    sellers,
-    orders,
-    bcvRate: window.bcvRate,
-    exportedAt: new Date().toISOString()
-  };
-
-  const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(backupData, null, 2));
-  const downloadAnchor = document.createElement('a');
-  downloadAnchor.setAttribute("href", dataStr);
-  downloadAnchor.setAttribute("download", `AvocadoShop_Backup_${Date.now()}.json`);
-  document.body.appendChild(downloadAnchor);
-  downloadAnchor.click();
-  downloadAnchor.remove();
-};
-
-window.importDataJSON = (event) => {
-  const fileReader = new FileReader();
-  fileReader.onload = (e) => {
-    try {
-      const importedData = JSON.parse(e.target.result);
-
-      if (importedData.products && importedData.sellers) {
-        products = importedData.products;
-        sellers = importedData.sellers;
-        if (importedData.orders) orders = importedData.orders;
-        if (importedData.bcvRate) window.bcvRate = importedData.bcvRate;
-
-        saveState();
-        updateBcvUI();
-        renderStoreProducts();
-        filterAdminView();
-        alert("✅ Datos e inventario importados con éxito.");
-      } else {
-        alert("❌ El archivo subido no posee un formato válido para Avocado Shop.");
-      }
-    } catch (err) {
-      alert("❌ Error al procesar el archivo JSON.");
-    }
-  };
-
-  if (event.target.files[0]) {
-    fileReader.readAsText(event.target.files[0]);
-  }
-};
-
+// Configuración de eventos de la interfaz
 function setupFilters() {
-  document.getElementById('searchInput').addEventListener('input', () => {
-    renderStoreProducts();
-  });
+  const searchInput = document.getElementById('searchInput');
+  if (searchInput) {
+    searchInput.addEventListener('input', () => {
+      renderStoreProducts();
+    });
+  }
 
   document.querySelectorAll('.cat-filter').forEach(btn => {
     btn.addEventListener('click', (e) => {
@@ -1042,84 +1134,29 @@ function setupFilters() {
     });
   });
 
-  document.getElementById('btnOpenCart').addEventListener('click', () => document.getElementById('cartModal').classList.remove('hidden'));
-  document.getElementById('btnCloseCart').addEventListener('click', () => document.getElementById('cartModal').classList.add('hidden'));
+  const btnOpenCart = document.getElementById('btnOpenCart');
+  const btnCloseCart = document.getElementById('btnCloseCart');
+  if (btnOpenCart) btnOpenCart.addEventListener('click', () => document.getElementById('cartModal').classList.remove('hidden'));
+  if (btnCloseCart) btnCloseCart.addEventListener('click', () => document.getElementById('cartModal').classList.add('hidden'));
 }
 
-window.toggleDeliveryAddress = () => {
-  const option = document.getElementById('deliveryOption').value;
-  const deliveryContainer = document.getElementById('deliveryAddressContainer');
-  const pickupContainer = document.getElementById('pickupBranchContainer');
-
-  if (option === 'delivery') {
-    deliveryContainer.classList.remove('hidden');
-    pickupContainer.classList.add('hidden');
-  } else {
-    deliveryContainer.classList.add('hidden');
-    pickupContainer.classList.remove('hidden');
-  }
-};
-
-window.updateBcvRatePrompt = () => {
-  const newRate = prompt("Ingrese la tasa actual del BCV (Bs. por USD):", window.bcvRate);
-  if (newRate === null) return;
-
-  const parsedRate = parseFloat(newRate);
-  if (isNaN(parsedRate) || parsedRate <= 0) {
-    alert("Ingrese un monto válido.");
-    return;
-  }
-
-  window.bcvRate = parsedRate;
-  updateBcvUI();
+// Inicialización general al cargar el DOM
+document.addEventListener('DOMContentLoaded', () => {
+  fetchLiveBcvRate();
   renderStoreProducts();
-  updateCartUI();
-};
+  setupFilters();
 
-function updateBcvUI() {
-  const formattedRate = `Bs. ${window.bcvRate.toFixed(2)}`;
-  const displayDesktop = document.getElementById('bcvRateDisplay');
-  const displayMobile = document.getElementById('bcvRateDisplayMobile');
-  const displayCart = document.getElementById('cartBcvRate');
-
-  if (displayDesktop) displayDesktop.textContent = formattedRate;
-  if (displayMobile) displayMobile.textContent = formattedRate;
-  if (displayCart) displayCart.textContent = `${formattedRate} / USD`;
-}
-// Servicios del Centro de Manicura y Pedicura
-let manicureServices = [
-  { id: "srv-1", name: "Manicura Rusa + Gelificación", duration: "90 min", price: 25.00 },
-  { id: "srv-2", name: "Sistema de Uñas (Polygel / Acrílico)", duration: "120 min", price: 35.00 },
-  { id: "srv-3", name: "Pedicura Spa + Esmaltado Semipermanente", duration: "60 min", price: 20.00 },
-  { id: "srv-4", name: "Mantenimiento / Retiro de Sistema", duration: "45 min", price: 15.00 }
-];
-
-// Personal / Manicuristas por Sucursal
-let staffMembers = [
-  { id: "stf-1", name: "Valeria Gómez", branch: "San Félix", specialty: "Nail Art & Polygel" },
-  { id: "stf-2", name: "Camila Rivas", branch: "CC Alta Vista I", specialty: "Manicura Rusa" },
-  { id: "stf-3", name: "Daniela Torres", branch: "CC Alta Vista II", specialty: "Pedicura Spa & Gel" }
-];
-
-// Citas iniciales de prueba
-let appointments = JSON.parse(localStorage.getItem('avocado_appointments')) || [
-  {
-    appointmentId: "AVO-CIT-101",
-    clientName: "Laura Mendoza",
-    clientPhone: "584141234567",
-    serviceId: "srv-1",
-    serviceName: "Manicura Rusa + Gelificación",
-    price: 25.00,
-    branch: "San Félix",
-    staffId: "stf-1",
-    staffName: "Valeria Gómez",
-    date: "2026-09-15",
-    time: "10:00 AM",
-    status: "Confirmada",
-    createdAt: new Date().toISOString()
+  const userBranchSelect = document.getElementById('userBranchSelect');
+  if (userBranchSelect) {
+    userBranchSelect.addEventListener('change', () => {
+      renderStoreProducts();
+    });
   }
-];
 
-function saveAppointmentsState() {
-  localStorage.setItem('avocado_appointments', JSON.stringify(appointments));
-}
+  setTimeout(() => {
+    if (window.loadAppointmentsFromSupabase) window.loadAppointmentsFromSupabase();
+    if (window.populateAppointmentSelects) window.populateAppointmentSelects();
+    if (window.loadStaffTable) window.loadStaffTable();
+    if (window.loadServicesTable) window.loadServicesTable();
+  }, 500);
+});
