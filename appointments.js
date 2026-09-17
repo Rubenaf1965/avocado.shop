@@ -316,11 +316,9 @@ window.addStaffPrompt = async function() {
   if (nombre) {
     const client = getSupabaseClient();
     if (client) {
-      const { error } = await client.from('manicuristas').insert([{ nombre, sucursal }]);
+      const { error } = await client.from('manicuristas').insert([{ nombre, sucursal, activo: true }]);
       if (error) alert("Error al guardar en Supabase: " + error.message);
       else window.loadStaffTable();
-    } else {
-      alert(`Manicurista ${nombre} agregada en modo local.`);
     }
   }
 };
@@ -349,8 +347,6 @@ window.addServicePrompt = async function() {
       const { error } = await client.from('servicios').insert([{ nombre, duracion, precio }]);
       if (error) alert("Error al guardar servicio: " + error.message);
       else window.loadServicesTable();
-    } else {
-      alert(`Servicio "${nombre}" guardado a $${precio.toFixed(2)}.`);
     }
   }
 };
@@ -378,17 +374,22 @@ window.loadStaffTable = async function() {
   }
 
   if (staffList.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="4" class="p-3 text-center text-slate-400">No hay manicuristas registradas</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="5" class="p-3 text-center text-slate-400">No hay manicuristas registradas</td></tr>`;
     return;
   }
 
   tbody.innerHTML = staffList.map(stf => `
     <tr class="border-b border-slate-50">
-      <td class="p-2.5 font-bold text-slate-800">${stf.nombre || stf.name || 'Sin Nombre'}</td>
+      <td class="p-2.5 font-bold text-slate-800">${stf.nombre}</td>
       <td class="p-2.5 text-slate-600">${stf.especialidad || 'Especialista'}</td>
-      <td class="p-2.5 text-slate-600">${stf.sucursal || 'Todas'}</td>
+      <td class="p-2.5 text-slate-600">${stf.sucursal || 'San Félix'}</td>
+      <td class="p-2.5">
+        <span class="px-2 py-0.5 rounded-full text-[10px] font-bold ${stf.activo !== false ? 'bg-emerald-100 text-emerald-800' : 'bg-gray-100 text-gray-600'}">
+          ${stf.activo !== false ? 'Activo' : 'Inactivo'}
+        </span>
+      </td>
       <td class="p-2.5 text-center">
-        <button onclick="window.deleteStaff('${stf.id}')" class="text-xs text-red-500 hover:font-bold" title="Eliminar">🗑️ Eliminar</button>
+        <button onclick="window.deleteStaff('${stf.id}')" class="text-xs text-red-500 hover:font-bold" title="Eliminar">🗑️</button>
       </td>
     </tr>
   `).join('');
@@ -414,26 +415,18 @@ window.loadServicesTable = async function() {
   }
 
   tbody.innerHTML = servicesList.map(srv => {
-    const precioUsd = Number(srv.precio || srv.precio_usd || srv.price_usd || 0);
+    const precioUsd = Number(srv.precio || 0);
     const priceBs = (precioUsd * currentBcv).toFixed(2);
     return `
       <tr class="border-b border-slate-50">
-        <td class="p-2.5 font-bold text-slate-800">${srv.nombre || srv.name}</td>
-        <td class="p-2.5 text-slate-500">${srv.duracion || srv.duration || 'N/A'}</td>
+        <td class="p-2.5 font-bold text-slate-800">${srv.nombre}</td>
+        <td class="p-2.5 text-slate-500">${srv.duracion || 'N/A'}</td>
         <td class="p-2.5 font-bold text-emerald-700">$${precioUsd.toFixed(2)}</td>
         <td class="p-2.5 font-bold text-slate-700">Bs. ${priceBs}</td>
         <td class="p-2.5 text-center">
-          <button onclick="window.deleteService('${srv.id}')" class="text-xs text-red-500 hover:font-bold" title="Eliminar">🗑️ Eliminar</button>
+          <button onclick="window.deleteService('${srv.id}')" class="text-xs text-red-500 hover:font-bold" title="Eliminar">🗑️</button>
         </td>
       </tr>
     `;
   }).join('');
 };
-
-// Carga automática inicial de las tablas
-document.addEventListener('DOMContentLoaded', () => {
-  setTimeout(() => {
-    if (window.loadStaffTable) window.loadStaffTable();
-    if (window.loadServicesTable) window.loadServicesTable();
-  }, 600);
-});
