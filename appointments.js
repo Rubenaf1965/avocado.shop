@@ -1,15 +1,4 @@
 // --- CONSTANTES Y CONFIGURACIÓN DE CITAS ---
-const staffMembers = [
-    { id: 'staff-1', name: 'Especialista San Félix', branch: 'san felix' },
-    { id: 'staff-2', name: 'Especialista Alta Vista', branch: 'cc alta vista i' }
-];
-
-const manicureServices = [
-    { id: 'manicure', name: 'Manicure', price: 20.00, duration: '2 horas' },
-    { id: 'pedicure', name: 'Pedicure', price: 18.00, duration: '1 hora 40 minutos' },
-    { id: 'Manicura Rusa + Gelificación', name: 'Manicura Rusa + Gelificación', price: 25.00, duration: '2 horas' }
-];
-
 window.appointments = window.appointments || [];
 
 // Función auxiliar segura para obtener el cliente de Supabase
@@ -20,6 +9,45 @@ function getSupabaseClient() {
     return (client && typeof client.from === 'function') ? client : null;
 }
 
+// OBTENER TASA BCV GLOBAL ACTIVA
+function getActiveBcvRate() {
+    if (window.bcvRate && !isNaN(window.bcvRate) && window.bcvRate > 0) {
+        return parseFloat(window.bcvRate);
+    }
+    const bcvBadge = document.getElementById('bcvRateDisplay') || document.querySelector('[id*="bcv"]');
+    if (bcvBadge) {
+        const parsed = parseFloat(bcvBadge.innerText.replace(/[^0-9.]/g, ''));
+        if (!isNaN(parsed) && parsed > 0) return parsed;
+    }
+    return 847.44; // Fallback
+}
+
+// POBLAR SELECTS DEL FORMULARIO DE RESERVA DESDE SUPABASE
+window.populateAppointmentSelects = async function() {
+    const client = getSupabaseClient();
+    if (!client) return;
+
+    const serviceSelect = document.getElementById('appServiceSelect');
+    const staffSelect = document.getElementById('appStaffSelect');
+
+    // Cargar Servicios
+    const { data: serviciosData } = await client.from('servicios').select('*');
+    if (serviceSelect && serviciosData && serviciosData.length > 0) {
+        serviceSelect.innerHTML = '<option value="">Selecciona un servicio</option>' + 
+            serviciosData.map(s => {
+                const precio = Number(s.precio_usd ?? s.precio ?? 0);
+                return `<option value="${s.id}" data-price="${precio}" data-name="${s.nombre}">${s.nombre} ($${precio.toFixed(2)})</option>`;
+            }).join('');
+    }
+
+    // Cargar Manicuristas
+    const { data: staffData } = await client.from('manicuristas').select('*').eq('activo', true);
+    if (staffSelect && staffData && staffData.length > 0) {
+        staffSelect.innerHTML = '<option value="">Selecciona una especialista</option>' + 
+            staffData.map(m => `<option value="${m.id}" data-name="${m.nombre}">${m.nombre} (${m.sucursal || 'San Félix'})</option>`).join('');
+    }
+};
+
 // --- PROCESAR LA RESERVA DESDE EL FORMULARIO WEB ---
 window.handleCreateAppointment = async (e) => {
     e.preventDefault();
@@ -28,8 +56,7 @@ window.handleCreateAppointment = async (e) => {
     const clientPhone = document.getElementById('appClientPhone').value.trim();
     const branch = document.getElementById('appBranchSelect').value;
     const serviceSelectElement = document.getElementById('appServiceSelect');
-    const serviceId = serviceSelectElement.value;
-    const staffId = document.getElementById('appStaffSelect').value;
+    const staffSelectElement = document.getElementById('appStaffSelect');
     const date = document.getElementById('appDate').value;
     const time = document.getElementById('appTimeSelect').value;
 
@@ -38,21 +65,16 @@ window.handleCreateAppointment = async (e) => {
         return;
     }
 
-    let service = manicureServices.find(s => s.id === serviceId || s.name === serviceId);
-    if (!service) {
-        const selectedText = serviceSelectElement.options[serviceSelectElement.selectedIndex].text;
-        service = {
-            id: serviceId,
-            name: selectedText.split('(')[0].trim() || serviceId,
-            price: 25.00
-        };
-    }
+    const selectedServiceOption = serviceSelectElement.options[serviceSelectElement.selectedIndex];
+    const serviceName = selectedServiceOption?.dataset?.name || selectedServiceOption?.text.split('(')[0].trim() || 'Servicio General';
+    const servicePrice = parseFloat(selectedServiceOption?.dataset?.price) || 20.00;
 
-    const staff = staffMembers.find(s => s.id === staffId);
+    const selectedStaffOption = staffSelectElement.options[staffSelectElement.selectedIndex];
+    const staffNameFinal = selectedStaffOption?.dataset?.name || selectedStaffOption?.text.split('(')[0].trim() || 'Asignación Automática';
+
     const appointmentId = 'AVO-CIT-' + Math.floor(1000 + Math.random() * 9000);
-    const currentBcv = window.bcvRate || 36.50;
-    const totalBs = (service.price * currentBcv).toFixed(2);
-    const staffNameFinal = staff ? staff.name : 'Asignación Automática';
+    const currentBcv = getActiveBcvRate();
+    const totalBs = (servicePrice * currentBcv).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
     try {
         const client = getSupabaseClient();
@@ -61,7 +83,7 @@ window.handleCreateAppointment = async (e) => {
                 codigo: appointmentId,
                 cliente: clientName,
                 telefono: clientPhone,
-                servicio: service.name,
+                servicio: serviceName,
                 sucursal_especialista: `${branch} (${staffNameFinal})`,
                 fecha_hora: `${date} - ${time}`,
                 estado: 'Pendiente'
@@ -77,12 +99,12 @@ window.handleCreateAppointment = async (e) => {
     let msg = `✨ *SOLICITUD DE CITA - AVOCADO SPA* ✨\n\n`;
     msg += `🆔 *Cita:* #${appointmentId}\n`;
     msg += `👤 *Cliente:* ${clientName}\n`;
-    msg += `💅 *Servicio:* ${service.name}\n`;
+    msg += `💅 *Servicio:* ${serviceName}\n`;
     msg += `🏢 *Sucursal:* ${branch}\n`;
     msg += `👩‍🎨 *Especialista:* ${staffNameFinal}\n`;
     msg += `📅 *Fecha:* ${date}\n`;
     msg += `⏰ *Hora:* ${time}\n`;
-    msg += `💰 *Total:* $${service.price.toFixed(2)} (Bs. ${totalBs})\n\n`;
+    msg += `💰 *Total:* $${servicePrice.toFixed(2)} (Bs. ${totalBs})\n\n`;
     msg += `_Quedo a la espera de la confirmación de la cita._`;
 
     window.open(`https://wa.me/584143943252?text=${encodeURIComponent(msg)}`, '_blank');
@@ -128,7 +150,7 @@ async function loadAppointmentsFromSupabase() {
     renderAppointmentsTableSafe();
 }
 
-// Función para cambiar el estado de la cita en tiempo real
+// Cambiar el estado de la cita
 window.updateAppointmentStatus = async (appointmentId, newStatus) => {
     const client = getSupabaseClient();
     const app = window.appointments.find(a => a.appointmentId === appointmentId || a.id == appointmentId);
@@ -151,7 +173,7 @@ window.updateAppointmentStatus = async (appointmentId, newStatus) => {
     await loadAppointmentsFromSupabase();
 };
 
-// Función para eliminar cita
+// Eliminar cita
 window.deleteAppointment = async (appointmentId) => {
     if (!confirm(`¿Estás seguro de eliminar la cita #${appointmentId}?`)) return;
 
@@ -176,7 +198,7 @@ window.deleteAppointment = async (appointmentId) => {
     await loadAppointmentsFromSupabase();
 };
 
-// Renderizar la tabla de citas
+// Renderizar tabla de citas
 function renderAppointmentsTableSafe() {
     const tbody = document.getElementById('appointmentsTableBody');
     if (!tbody) return;
@@ -211,12 +233,7 @@ function renderAppointmentsTableSafe() {
     `).join('');
 }
 
-// Inicializar al cargar la página
-window.addEventListener('DOMContentLoaded', loadAppointmentsFromSupabase);
-window.addEventListener('load', loadAppointmentsFromSupabase);
-
 // --- FUNCIONES DE REPORTES EN PANTALLA E IMPRESIÓN ---
-
 window.displayAppointmentsScreen = async function() {
   const modal = document.getElementById('screenAppointmentsModal');
   const tableContainer = document.getElementById('screenAppointmentsBody');
@@ -317,8 +334,12 @@ window.addStaffPrompt = async function() {
     const client = getSupabaseClient();
     if (client) {
       const { error } = await client.from('manicuristas').insert([{ nombre, sucursal, activo: true }]);
-      if (error) alert("Error al guardar en Supabase: " + error.message);
-      else window.loadStaffTable();
+      if (error) {
+        alert("Error al guardar en Supabase: " + error.message);
+      } else {
+        await window.loadStaffTable();
+        await window.populateAppointmentSelects();
+      }
     }
   }
 };
@@ -329,8 +350,12 @@ window.deleteStaff = async function(id) {
   const client = getSupabaseClient();
   if (client) {
     const { error } = await client.from('manicuristas').delete().eq('id', id);
-    if (error) alert("Error al eliminar: " + error.message);
-    else window.loadStaffTable();
+    if (error) {
+      alert("Error al eliminar: " + error.message);
+    } else {
+      await window.loadStaffTable();
+      await window.populateAppointmentSelects();
+    }
   }
 };
 
@@ -344,7 +369,6 @@ window.addServicePrompt = async function() {
   if (nombre && !isNaN(precioInput)) {
     const client = getSupabaseClient();
     if (client) {
-      // Se envián los nombres de columna precio_usd, precio y duracion
       const { error } = await client.from('servicios').insert([{ 
         nombre: nombre, 
         duracion: duracion, 
@@ -355,7 +379,8 @@ window.addServicePrompt = async function() {
       if (error) {
         alert("Error al guardar servicio: " + error.message);
       } else {
-        window.loadServicesTable();
+        await window.loadServicesTable();
+        await window.populateAppointmentSelects();
       }
     }
   }
@@ -367,8 +392,12 @@ window.deleteService = async function(id) {
   const client = getSupabaseClient();
   if (client) {
     const { error } = await client.from('servicios').delete().eq('id', id);
-    if (error) alert("Error al eliminar: " + error.message);
-    else window.loadServicesTable();
+    if (error) {
+      alert("Error al eliminar: " + error.message);
+    } else {
+      await window.loadServicesTable();
+      await window.populateAppointmentSelects();
+    }
   }
 };
 
@@ -409,8 +438,7 @@ window.loadServicesTable = async function() {
   const tbody = document.getElementById('servicesTableBody');
   if (!tbody) return;
 
-  const bcvText = document.getElementById('bcvRateDisplay')?.innerText || '0';
-  const currentBcv = parseFloat(bcvText.replace(/[^0-9.]/g, '')) || 36.50;
+  const currentBcv = getActiveBcvRate();
 
   let servicesList = [];
   const client = getSupabaseClient();
@@ -425,9 +453,9 @@ window.loadServicesTable = async function() {
   }
 
   tbody.innerHTML = servicesList.map(srv => {
-    // Lee precio_usd si existe, o cae en precio / price_usd
-    const precioUsd = Number(srv.precio_usd ?? srv.precio ?? srv.price_usd ?? 0);
-    const priceBs = (precioUsd * currentBcv).toFixed(2);
+    const precioUsd = Number(srv.precio_usd ?? srv.precio ?? 0);
+    const priceBs = (precioUsd * currentBcv).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    
     return `
       <tr class="border-b border-slate-50">
         <td class="p-2.5 font-bold text-slate-800">${srv.nombre}</td>
@@ -441,3 +469,13 @@ window.loadServicesTable = async function() {
     `;
   }).join('');
 };
+
+// Carga inicial al estar listo el DOM
+document.addEventListener('DOMContentLoaded', () => {
+  setTimeout(() => {
+    if (window.loadAppointmentsFromSupabase) window.loadAppointmentsFromSupabase();
+    if (window.populateAppointmentSelects) window.populateAppointmentSelects();
+    if (window.loadStaffTable) window.loadStaffTable();
+    if (window.loadServicesTable) window.loadServicesTable();
+  }, 500);
+});
