@@ -48,7 +48,7 @@ window.populateAppointmentSelects = async function() {
     }
 };
 
-// --- PROCESAR LA RESERVA DESDE EL FORMULARIO WEB ---
+// --- PROCESAR LA RESERVA DESDE EL FORMULARIO WEB (CON VALIDACIÓN DE DISPONIBILIDAD) ---
 window.handleCreateAppointment = async (e) => {
     e.preventDefault();
 
@@ -72,23 +72,68 @@ window.handleCreateAppointment = async (e) => {
     const selectedStaffOption = staffSelectElement.options[staffSelectElement.selectedIndex];
     const staffNameFinal = selectedStaffOption?.dataset?.name || selectedStaffOption?.text.split('(')[0].trim() || 'Asignación Automática';
 
+    const sucursalEspecialistaFinal = `${branch} (${staffNameFinal})`;
+    const formatoFechaHora1 = `${date}T${time}:00+00:00`;
+    const formatoFechaHora2 = `${date} - ${time}`;
+
+    const client = getSupabaseClient();
+
+    // 1. VALIDAR DISPONIBILIDAD EN SUPABASE ANTES DE REGISTRAR
+    if (client) {
+        try {
+            const { data: existingAppointments, error: checkError } = await client
+                .from('appointments')
+                .select('*')
+                .eq('sucursal_especialista', sucursalEspecialistaFinal);
+
+            if (checkError) {
+                console.error('Error al verificar citas existentes:', checkError.message);
+            }
+
+            if (existingAppointments && existingAppointments.length > 0) {
+                // Verificar si existe alguna cita no cancelada en la misma fecha y hora
+                const conflicto = existingAppointments.find(app => {
+                    const estado = (app.estado || '').toLowerCase();
+                    const esActiva = estado !== 'cancelado' && estado !== 'cancelada';
+                    const mismaFechaHora = app.fecha_hora === formatoFechaHora1 || 
+                                          app.fecha_hora === formatoFechaHora2 || 
+                                          app.fecha_hora.includes(`${date}T${time}`) || 
+                                          app.fecha_hora.includes(`${date} - ${time}`);
+                    return esActiva && mismaFechaHora;
+                });
+
+                if (conflicto) {
+                    alert(`⚠️ NO DISPONIBILIDAD\n\nLa especialista ${staffNameFinal} en la sucursal ${branch} ya cuenta con una cita registrada el ${date} a las ${time}.\n\nPor favor, selecciona otro horario o especialista.`);
+                    return; // Bloquea la creación y no abre WhatsApp
+                }
+            }
+        } catch (err) {
+            console.error('Excepción al validar duplicados:', err);
+        }
+    }
+
+    // 2. REGISTRO DE LA CITA
     const appointmentId = 'AVO-CIT-' + Math.floor(1000 + Math.random() * 9000);
     const currentBcv = getActiveBcvRate();
     const totalBs = (servicePrice * currentBcv).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
     try {
-        const client = getSupabaseClient();
         if (client) {
             const { error: dbError } = await client.from('appointments').insert([{
                 codigo: appointmentId,
                 cliente: clientName,
                 telefono: clientPhone,
                 servicio: serviceName,
-                sucursal_especialista: `${branch} (${staffNameFinal})`,
-                fecha_hora: `${date} - ${time}`,
+                sucursal_especialista: sucursalEspecialistaFinal,
+                fecha_hora: formatoFechaHora1,
                 estado: 'Pendiente'
             }]);
-            if (dbError) console.error('Aviso de Supabase al insertar:', dbError.message);
+            
+            if (dbError) {
+                console.error('Aviso de Supabase al insertar:', dbError.message);
+                alert("Hubo un error al guardar la cita en la base de datos.");
+                return;
+            }
         }
     } catch (err) {
         console.error('Excepción al conectar con Supabase:', err);
@@ -96,6 +141,7 @@ window.handleCreateAppointment = async (e) => {
 
     await loadAppointmentsFromSupabase();
 
+    // 3. ENVÍO A WHATSAPP
     let msg = `✨ *SOLICITUD DE CITA - AVOCADO SPA* ✨\n\n`;
     msg += `🆔 *Cita:* #${appointmentId}\n`;
     msg += `👤 *Cliente:* ${clientName}\n`;
@@ -224,6 +270,7 @@ function renderAppointmentsTableSafe() {
                     <option value="Pendiente" ${app.status === 'Pendiente' ? 'selected' : ''}>Pendiente</option>
                     <option value="En Verificación" ${app.status === 'En Verificación' ? 'selected' : ''}>En Verificación</option>
                     <option value="Verificado" ${app.status === 'Verificado' ? 'selected' : ''}>Verificado</option>
+                    <option value="Cancelado" ${app.status === 'Cancelado' ? 'selected' : ''}>Cancelado</option>
                 </select>
             </td>
             <td class="p-2.5 text-center">
