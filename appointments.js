@@ -339,14 +339,24 @@ window.addServicePrompt = async function() {
   if (!nombre) return;
   
   const duracion = prompt("Duración estimada (ej. 45 min, 1h 30m):", "1 hora");
-  const precio = parseFloat(prompt("Precio en USD ($):", "20.00"));
+  const precioInput = parseFloat(prompt("Precio en USD ($):", "20.00"));
 
-  if (nombre && !isNaN(precio)) {
+  if (nombre && !isNaN(precioInput)) {
     const client = getSupabaseClient();
     if (client) {
-      const { error } = await client.from('servicios').insert([{ nombre, duracion, precio }]);
-      if (error) alert("Error al guardar servicio: " + error.message);
-      else window.loadServicesTable();
+      // Se envián los nombres de columna precio_usd, precio y duracion
+      const { error } = await client.from('servicios').insert([{ 
+        nombre: nombre, 
+        duracion: duracion, 
+        precio_usd: precioInput, 
+        precio: precioInput 
+      }]);
+      
+      if (error) {
+        alert("Error al guardar servicio: " + error.message);
+      } else {
+        window.loadServicesTable();
+      }
     }
   }
 };
@@ -415,7 +425,8 @@ window.loadServicesTable = async function() {
   }
 
   tbody.innerHTML = servicesList.map(srv => {
-    const precioUsd = Number(srv.precio || 0);
+    // Lee precio_usd si existe, o cae en precio / price_usd
+    const precioUsd = Number(srv.precio_usd ?? srv.precio ?? srv.price_usd ?? 0);
     const priceBs = (precioUsd * currentBcv).toFixed(2);
     return `
       <tr class="border-b border-slate-50">
