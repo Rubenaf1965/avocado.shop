@@ -1170,3 +1170,6 @@ window.closeScreenReport = function() { const modal = document.getElementById('s
 
 
 window.closeScreenReport = function() { const modal = document.getElementById('screenReportModal'); if (modal) modal.classList.add('hidden'); };
+
+
+window.displayInventoryScreen = function() { const modal = document.getElementById('screenReportModal'); if (modal) modal.classList.remove('hidden'); if (typeof renderScreenReport === 'function') { renderScreenReport(); } };
