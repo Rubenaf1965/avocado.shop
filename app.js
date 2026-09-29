@@ -1199,14 +1199,20 @@ window.printInventoryReport = function() {
 };
 
 window.addSellerPrompt = function() {
-  const name = prompt("Nombre del nuevo vendedor:");
+  const name = prompt("Nombre de la nueva vendedora:");
   if (!name) return;
   const branch = prompt("Sucursal asignada (San Félix / CC Alta Vista I / CC Alta Vista II):", "San Félix");
-  const commission = prompt("% de Comisión:", "5");
+  let commissionInput = prompt("% de Comisión (ej: 5):", "5");
+  
+  // Limpiar el input para asegurarnos de que sea un número válido
+  const commissionRate = parseFloat(commissionInput.replace('%', '').trim()) || 5;
+  
   if (typeof registerNewSeller === 'function') {
-    registerNewSeller(name, branch, commission);
-  } else {
-    console.log("Registrar vendedor:", name, branch, commission);
+    registerNewSeller(name, branch, commissionRate);
+  } else if (typeof sellers !== 'undefined') {
+    sellers.push({ name, branch, sales: 0, commissionRate: commissionRate });
+    if (typeof saveState === 'function') saveState();
+    location.reload();
   }
 };
 
