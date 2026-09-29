@@ -1226,3 +1226,33 @@ window.deleteSeller = function(id) {
     if (typeof removeSeller === 'function') removeSeller(id);
   }
 };
+// --- CONEXIÓN REAL DE FUNCIONES DE VENDEDORES EN APP.JS ---
+
+window.addSellerPrompt = function() {
+  const name = prompt("Nombre de la nueva vendedora:");
+  if (!name) return;
+  const branch = prompt("Sucursal asignada (San Félix / CC Alta Vista I / CC Alta Vista II):", "San Félix");
+  const commission = prompt("% de Comisión:", "5");
+  
+  // Si tu app maneja un array local o función de registro, se invoca aquí:
+  if (typeof registerNewSeller === 'function') {
+    registerNewSeller(name, branch, commission);
+  } else if (typeof sellers !== 'undefined') {
+    sellers.push({ name, branch, sales: 0, commissionRate: parseFloat(commission) || 5 });
+    if (typeof saveState === 'function') saveState();
+    if (typeof renderSellers === 'function') renderSellers();
+    location.reload(); // Recarga para refrescar la tabla
+  }
+};
+
+window.deleteSeller = function(idOrIndex) {
+  if (confirm("¿Estás seguro de eliminar este vendedor?")) {
+    if (typeof removeSeller === 'function') {
+      removeSeller(idOrIndex);
+    } else if (typeof sellers !== 'undefined') {
+      sellers.splice(idOrIndex, 1);
+      if (typeof saveState === 'function') saveState();
+      location.reload();
+    }
+  }
+};
