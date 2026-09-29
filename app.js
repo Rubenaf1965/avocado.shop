@@ -1262,3 +1262,31 @@ window.deleteSeller = function(idOrIndex) {
     }
   }
 };
+window.addSellerPrompt = function() {
+  const name = prompt("Nombre de la nueva vendedora:");
+  if (!name) return;
+  const branch = prompt("Sucursal asignada (San Félix / CC Alta Vista I / CC Alta Vista II):", "San Félix");
+  let commissionInput = prompt("% de Comisión (ej: 5):", "5");
+  
+  // Limpiar y asegurar que sea un número válido
+  const parsedCommission = parseFloat(commissionInput ? commissionInput.replace('%', '').trim() : 5) || 5;
+  
+  if (typeof registerNewSeller === 'function') {
+    registerNewSeller(name, branch, parsedCommission);
+  } else if (typeof sellers !== 'undefined') {
+    // Intentamos adaptarnos a las propiedades que usa tu app (comision o commissionRate)
+    sellers.push({ 
+      name: name, 
+      branch: branch, 
+      sales: 0, 
+      comision: parsedCommission, 
+      commissionRate: parsedCommission 
+    });
+    if (typeof saveState === 'function') saveState();
+    if (typeof renderSellers === 'function') {
+      renderSellers(); // Refresca solo la tabla de vendedores sin recargar toda la página
+    } else {
+      location.reload();
+    }
+  }
+};
