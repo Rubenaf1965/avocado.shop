@@ -1013,13 +1013,14 @@ function renderSellersTable(filterBranch = activeAdminBranch) {
 
   tbody.innerHTML = filtered.map((s) => {
     const realIndex = window.sellers.findIndex(item => item.id === s.id);
+    const comm = s.commRate || s.comision || 5;
     return `
       <tr>
         <td class="p-2.5 font-medium text-slate-800">${s.name}</td>
         <td class="p-2.5 text-slate-500">${s.branch}</td>
         <td class="p-2.5 font-semibold text-slate-700">$${s.sales.toFixed(2)}</td>
-        <td class="p-2.5 font-bold text-slate-800">${s.commRate}%</td>
-        <td class="p-2.5 font-bold text-emerald-600">$${(s.sales * (s.commRate / 100)).toFixed(2)}</td>
+        <td class="p-2.5 font-bold text-slate-800">${comm}%</td>
+        <td class="p-2.5 font-bold text-emerald-600">$${(s.sales * (comm / 100)).toFixed(2)}</td>
         <td class="p-2.5 text-center flex justify-center gap-1.5">
           <button onclick="openEditSellerModal(${realIndex})" title="Editar Vendedor" class="bg-blue-50 text-blue-600 hover:bg-blue-100 px-2 py-1 rounded text-[10px] font-bold">✏️ Editar</button>
           <button onclick="deleteSeller(${realIndex})" title="Eliminar Vendedor" class="bg-red-50 text-red-600 hover:bg-red-100 px-2 py-1 rounded text-[10px] font-bold">🗑️</button>
@@ -1161,28 +1162,9 @@ document.addEventListener('DOMContentLoaded', () => {
   }, 500);
 });
 
-window.displayInventoryScreen = function() { const m = document.getElementById('screenReportModal'); if(m) m.classList.remove('hidden'); };
-window.printInventoryReport = function() { window.print(); };
-window.addSellerPrompt = function() { const name = prompt('Nombre del nuevo vendedor:'); if(!name) return; console.log('Nuevo vendedor:', name); };
-
-
-window.closeScreenReport = function() { const modal = document.getElementById('screenReportModal'); if (modal) modal.classList.add('hidden'); };
-
-
-window.closeScreenReport = function() { const modal = document.getElementById('screenReportModal'); if (modal) modal.classList.add('hidden'); };
-
-
-window.displayInventoryScreen = function() { const modal = document.getElementById('screenReportModal'); if (modal) modal.classList.remove('hidden'); if (typeof renderScreenReport === 'function') { renderScreenReport(); } };
-
-// --- EXPOSICIÓN GLOBAL DE FUNCIONES DE ADMINISTRACIÓN ---
-window.handleBranchAccessChange = function(selectElement) {
-  if (typeof filterByBranch === 'function') {
-    filterByBranch(selectElement.value);
-  } else {
-    console.log("Filtrar sucursal:", selectElement.value);
-  }
-};
-
+// ==========================================
+// MÓDULO DE REPORTES Y GESTIÓN DE VENDEDORES
+// ==========================================
 window.displayInventoryScreen = function() {
   const modal = document.getElementById('screenReportModal');
   if (modal) modal.classList.remove('hidden');
@@ -1198,8 +1180,16 @@ window.printInventoryReport = function() {
   window.print();
 };
 
+window.handleBranchAccessChange = function(selectElement) {
+  if (typeof filterByBranch === 'function') {
+    filterByBranch(selectElement.value);
+  } else {
+    activeAdminBranch = selectElement.value;
+    filterAdminView();
+  }
+};
+
 window.addSellerPrompt = function(event) {
-  // Evita que el navegador recargue la página o cierre el panel de administración
   if (event && typeof event.preventDefault === 'function') {
     event.preventDefault();
   }
@@ -1209,36 +1199,28 @@ window.addSellerPrompt = function(event) {
 
   const branch = prompt("Sucursal asignada (San Félix / CC Alta Vista I / CC Alta Vista II):", "San Félix");
   const commissionInput = prompt("% de Comisión (ej: 5):", "5");
+  const parsedCommission = parseFloat(String(commissionInput || '5').replace('%', '').trim()) || 5;
 
-  // Limpiar el porcentaje para evitar el 'undefined' o 'NaN'
-  const numericCommission = parseFloat(String(commissionInput).replace('%', '').trim()) || 5;
-
-  // Si existe la función original de registro en tu app, la usamos de forma segura
   if (typeof registerNewSeller === 'function') {
-    registerNewSeller(name.trim(), branch, numericCommission);
-  } else if (typeof sellers !== 'undefined') {
-    // Si manejas un arreglo local de vendedoras
-    sellers.push({
+    registerNewSeller(name.trim(), branch, parsedCommission);
+  } else if (typeof window.sellers !== 'undefined') {
+    window.sellers.push({
+      id: "s_" + Date.now(),
       name: name.trim(),
       branch: branch,
       sales: 0,
-      comision: numericCommission,
-      commissionRate: numericCommission
+      comision: parsedCommission,
+      commRate: parsedCommission
     });
-    
-    // Guardar estado si la función existe
-    if (typeof saveState === 'function') {
-      saveState();
-    }
-    
-    // Refrescar la tabla de vendedores en pantalla sin recargar todo el panel
-    if (typeof renderSellers === 'function') {
-      renderSellers();
+    saveState();
+    if (typeof renderSellersTable === 'function') {
+      renderSellersTable(activeAdminBranch);
     } else {
-      window.location.reload();
+      location.reload();
     }
   }
 };
+
 window.openEditSellerModal = function(id) {
   const modal = document.getElementById('editSellerModal');
   if (modal) modal.classList.remove('hidden');
@@ -1250,66 +1232,14 @@ window.closeEditSellerModal = function() {
   if (modal) modal.classList.add('hidden');
 };
 
-window.deleteSeller = function(id) {
-  if (confirm("¿Estás seguro de eliminar este vendedor?")) {
-    if (typeof removeSeller === 'function') removeSeller(id);
-  }
-};
-// --- CONEXIÓN REAL DE FUNCIONES DE VENDEDORES EN APP.JS ---
-
-window.addSellerPrompt = function() {
-  const name = prompt("Nombre de la nueva vendedora:");
-  if (!name) return;
-  const branch = prompt("Sucursal asignada (San Félix / CC Alta Vista I / CC Alta Vista II):", "San Félix");
-  const commission = prompt("% de Comisión:", "5");
-  
-  // Si tu app maneja un array local o función de registro, se invoca aquí:
-  if (typeof registerNewSeller === 'function') {
-    registerNewSeller(name, branch, commission);
-  } else if (typeof sellers !== 'undefined') {
-    sellers.push({ name, branch, sales: 0, commissionRate: parseFloat(commission) || 5 });
-    if (typeof saveState === 'function') saveState();
-    if (typeof renderSellers === 'function') renderSellers();
-    location.reload(); // Recarga para refrescar la tabla
-  }
-};
-
 window.deleteSeller = function(idOrIndex) {
   if (confirm("¿Estás seguro de eliminar este vendedor?")) {
     if (typeof removeSeller === 'function') {
       removeSeller(idOrIndex);
-    } else if (typeof sellers !== 'undefined') {
-      sellers.splice(idOrIndex, 1);
-      if (typeof saveState === 'function') saveState();
-      location.reload();
-    }
-  }
-};
-window.addSellerPrompt = function() {
-  const name = prompt("Nombre de la nueva vendedora:");
-  if (!name) return;
-  const branch = prompt("Sucursal asignada (San Félix / CC Alta Vista I / CC Alta Vista II):", "San Félix");
-  let commissionInput = prompt("% de Comisión (ej: 5):", "5");
-  
-  // Limpiar y asegurar que sea un número válido
-  const parsedCommission = parseFloat(commissionInput ? commissionInput.replace('%', '').trim() : 5) || 5;
-  
-  if (typeof registerNewSeller === 'function') {
-    registerNewSeller(name, branch, parsedCommission);
-  } else if (typeof sellers !== 'undefined') {
-    // Intentamos adaptarnos a las propiedades que usa tu app (comision o commissionRate)
-    sellers.push({ 
-      name: name, 
-      branch: branch, 
-      sales: 0, 
-      comision: parsedCommission, 
-      commissionRate: parsedCommission 
-    });
-    if (typeof saveState === 'function') saveState();
-    if (typeof renderSellers === 'function') {
-      renderSellers(); // Refresca solo la tabla de vendedores sin recargar toda la página
-    } else {
-      location.reload();
+    } else if (typeof window.sellers !== 'undefined') {
+      window.sellers.splice(idOrIndex, 1);
+      saveState();
+      renderSellersTable(activeAdminBranch);
     }
   }
 };
