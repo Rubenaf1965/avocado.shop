@@ -1198,24 +1198,47 @@ window.printInventoryReport = function() {
   window.print();
 };
 
-window.addSellerPrompt = function() {
+window.addSellerPrompt = function(event) {
+  // Evita que el navegador recargue la página o cierre el panel de administración
+  if (event && typeof event.preventDefault === 'function') {
+    event.preventDefault();
+  }
+
   const name = prompt("Nombre de la nueva vendedora:");
-  if (!name) return;
+  if (!name || name.trim() === "") return;
+
   const branch = prompt("Sucursal asignada (San Félix / CC Alta Vista I / CC Alta Vista II):", "San Félix");
-  let commissionInput = prompt("% de Comisión (ej: 5):", "5");
-  
-  // Limpiar el input para asegurarnos de que sea un número válido
-  const commissionRate = parseFloat(commissionInput.replace('%', '').trim()) || 5;
-  
+  const commissionInput = prompt("% de Comisión (ej: 5):", "5");
+
+  // Limpiar el porcentaje para evitar el 'undefined' o 'NaN'
+  const numericCommission = parseFloat(String(commissionInput).replace('%', '').trim()) || 5;
+
+  // Si existe la función original de registro en tu app, la usamos de forma segura
   if (typeof registerNewSeller === 'function') {
-    registerNewSeller(name, branch, commissionRate);
+    registerNewSeller(name.trim(), branch, numericCommission);
   } else if (typeof sellers !== 'undefined') {
-    sellers.push({ name, branch, sales: 0, commissionRate: commissionRate });
-    if (typeof saveState === 'function') saveState();
-    location.reload();
+    // Si manejas un arreglo local de vendedoras
+    sellers.push({
+      name: name.trim(),
+      branch: branch,
+      sales: 0,
+      comision: numericCommission,
+      commissionRate: numericCommission
+    });
+    
+    // Guardar estado si la función existe
+    if (typeof saveState === 'function') {
+      saveState();
+    }
+    
+    // Refrescar la tabla de vendedores en pantalla sin recargar todo el panel
+    if (typeof renderSellers === 'function') {
+      renderSellers();
+    } else {
+      window.location.reload();
+    }
   }
 };
-
 window.openEditSellerModal = function(id) {
   const modal = document.getElementById('editSellerModal');
   if (modal) modal.classList.remove('hidden');
