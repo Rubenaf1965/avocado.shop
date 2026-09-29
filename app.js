@@ -1160,3 +1160,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (window.loadServicesTable) window.loadServicesTable();
   }, 500);
 });
+
+window.displayInventoryScreen = function() { const m = document.getElementById('screenReportModal'); if(m) m.classList.remove('hidden'); };
+window.printInventoryReport = function() { window.print(); };
+window.addSellerPrompt = function() { const name = prompt('Nombre del nuevo vendedor:'); if(!name) return; console.log('Nuevo vendedor:', name); };
