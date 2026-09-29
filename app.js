@@ -1173,3 +1173,56 @@ window.closeScreenReport = function() { const modal = document.getElementById('s
 
 
 window.displayInventoryScreen = function() { const modal = document.getElementById('screenReportModal'); if (modal) modal.classList.remove('hidden'); if (typeof renderScreenReport === 'function') { renderScreenReport(); } };
+
+// --- EXPOSICIÓN GLOBAL DE FUNCIONES DE ADMINISTRACIÓN ---
+window.handleBranchAccessChange = function(selectElement) {
+  if (typeof filterByBranch === 'function') {
+    filterByBranch(selectElement.value);
+  } else {
+    console.log("Filtrar sucursal:", selectElement.value);
+  }
+};
+
+window.displayInventoryScreen = function() {
+  const modal = document.getElementById('screenReportModal');
+  if (modal) modal.classList.remove('hidden');
+  if (typeof renderScreenReport === 'function') renderScreenReport();
+};
+
+window.closeScreenReport = function() {
+  const modal = document.getElementById('screenReportModal');
+  if (modal) modal.classList.add('hidden');
+};
+
+window.printInventoryReport = function() {
+  window.print();
+};
+
+window.addSellerPrompt = function() {
+  const name = prompt("Nombre del nuevo vendedor:");
+  if (!name) return;
+  const branch = prompt("Sucursal asignada (San Félix / CC Alta Vista I / CC Alta Vista II):", "San Félix");
+  const commission = prompt("% de Comisión:", "5");
+  if (typeof registerNewSeller === 'function') {
+    registerNewSeller(name, branch, commission);
+  } else {
+    console.log("Registrar vendedor:", name, branch, commission);
+  }
+};
+
+window.openEditSellerModal = function(id) {
+  const modal = document.getElementById('editSellerModal');
+  if (modal) modal.classList.remove('hidden');
+  if (typeof loadSellerData === 'function') loadSellerData(id);
+};
+
+window.closeEditSellerModal = function() {
+  const modal = document.getElementById('editSellerModal');
+  if (modal) modal.classList.add('hidden');
+};
+
+window.deleteSeller = function(id) {
+  if (confirm("¿Estás seguro de eliminar este vendedor?")) {
+    if (typeof removeSeller === 'function') removeSeller(id);
+  }
+};
