@@ -1164,3 +1164,9 @@ document.addEventListener('DOMContentLoaded', () => {
 window.displayInventoryScreen = function() { const m = document.getElementById('screenReportModal'); if(m) m.classList.remove('hidden'); };
 window.printInventoryReport = function() { window.print(); };
 window.addSellerPrompt = function() { const name = prompt('Nombre del nuevo vendedor:'); if(!name) return; console.log('Nuevo vendedor:', name); };
+
+
+window.closeScreenReport = function() { const modal = document.getElementById('screenReportModal'); if (modal) modal.classList.add('hidden'); };
+
+
+window.closeScreenReport = function() { const modal = document.getElementById('screenReportModal'); if (modal) modal.classList.add('hidden'); };
