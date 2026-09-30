@@ -504,59 +504,79 @@ window.cancelPurchase = () => {
   document.getElementById('cartModal').classList.add('hidden');
 };
 
-window.processCheckout = async () => {
-  if (window.cart.length === 0) return alert('El carrito está vacío.');
-  const buyerName = document.getElementById('buyerName').value.trim();
-  const refNum = document.getElementById('pmReference').value.trim();
-  const deliveryOption = document.getElementById('deliveryOption').value;
-  const deliveryAddress = document.getElementById('deliveryAddressInput') ? document.getElementById('deliveryAddressInput').value : '';
-  const selectedBranch = document.getElementById('cartBranchSelect').value;
+window.processCheckout = async function() {
+  try {
+    // Lectura segura de los campos del carrito para evitar errores si alguno está oculto
+    const clientNameInput = document.getElementById('clientName') || document.querySelector('input[placeholder*="Nombre"]');
+    const deliveryOptionSelect = document.getElementById('deliveryOption');
+    const branchSelect = document.getElementById('branchSelect');
+    const deliveryAddressInput = document.getElementById('deliveryAddressInput');
+    const paymentRefInput = document.getElementById('paymentReference') || document.querySelector('input[placeholder*="235623"]');
 
-  if (!buyerName) return alert('Por favor ingrese el nombre del comprador.');
-  if (deliveryOption === 'delivery' && !deliveryAddress) return alert('Por favor ingrese la dirección de envío.');
-  if (!refNum) return alert('Por favor ingrese la referencia.');
+    const clientName = clientNameInput ? clientNameInput.value.trim() : "Cliente";
+    const deliveryType = deliveryOptionSelect ? deliveryOptionSelect.value : "pickup";
+    const branch = branchSelect ? branchSelect.value : "San Félix";
+    const deliveryAddress = deliveryAddressInput ? deliveryAddressInput.value.trim() : "";
+    const paymentReference = paymentRefInput ? paymentRefInput.value.trim() : "";
 
-  const totalUSD = window.cart.reduce((acc, i) => acc + (i.price * i.qty), 0);
-  const totalBS = totalUSD * window.bcvRate;
-  const orderId = 'AVO-' + Math.floor(100000 + Math.random() * 900000);
+    if (!clientName) {
+      alert("Por favor ingresa el nombre del comprador.");
+      return;
+    }
 
-  const deliveryTypeLabel = deliveryOption === 'delivery' ? 'Delivery' : 'Retiro en Sucursal';
-  const branchOrAddress = deliveryOption === 'delivery' ? deliveryAddress : selectedBranch;
+    if (deliveryType === 'delivery' && !deliveryAddress) {
+      alert("Por favor ingresa la dirección exacta de delivery.");
+      return;
+    }
 
-  const nuevaOrdenData = {
-    orderId,
-    clientName: buyerName,
-    deliveryType: deliveryTypeLabel,
-    branch: branchOrAddress,
-    user: `${buyerName.toLowerCase().replace(/\s+/g, '')}@cliente.com`,
-    items: [...window.cart],
-    total: totalUSD,
-    paymentReference: refNum,
-    status: 'En Verificación'
-  };
+    // Generar código único de orden
+    const orderId = 'AVO-' + Math.floor(100000 + Math.random() * 900000);
+    const cartItems = window.cart || [];
 
-  // Guardar en Supabase y sincronizar usando tu función centralizada
-  await window.crearOrden(nuevaOrdenData);
+    if (cartItems.length === 0) {
+      alert("Tu carrito está vacío.");
+      return;
+    }
 
-  let msgText = `¡Hola Avocado Shop! Orden #${orderId}\n`;
-  msgText += `Cliente: ${buyerName}\n`;
-  msgText += `Tipo de Entrega: ${deliveryTypeLabel}\n`;
-  if (deliveryOption === 'delivery') {
-    msgText += `Dirección de Envío: ${deliveryAddress}\n`;
-  } else {
-    msgText += `Sucursal de Retiro: ${selectedBranch}\n`;
+    const total = cartItems.reduce((sum, item) => sum + (Number(item.price) * Number(item.qty || 1)), 0);
+
+    const nuevaOrdenData = {
+      orderId: orderId,
+      clientName: clientName,
+      deliveryType: deliveryType === 'delivery' ? `Delivery (${deliveryAddress})` : `Retiro en Sucursal (${branch})`,
+      branch: branch,
+      total: total,
+      paymentReference: paymentReference,
+      status: 'En Verificación',
+      items: cartItems
+    };
+
+    // Guardar orden (usando tu función crearOrden existente)
+    if (typeof crearOrden === 'function') {
+      await crearOrden(nuevaOrdenData);
+    }
+
+    // Construir mensaje para WhatsApp
+    const itemsText = cartItems.map(i => `• ${i.name || i.product_name} (x${i.qty || 1}) - $${Number(i.price * (i.qty || 1)).toFixed(2)}`).join('\n');
+    const message = `*¡Nuevo Pedido!* (${orderId})\n\n*Cliente:* ${clientName}\n*Entrega:* ${nuevaOrdenData.deliveryType}\n*Ref. Pago:* ${paymentReference}\n\n*Productos:*\n${itemsText}\n\n*Total:* $${total.toFixed(2)}`;
+
+    // Abrir WhatsApp
+    const whatsappNumber = "584143943252"; // Ajusta tu número si es necesario
+    const whatsappUrl = `https://api.whatsapp.com/send?phone=${whatsappNumber}&text=${encodeURIComponent(message)}`;
+    
+    window.open(whatsappUrl, '_blank');
+
+    // Limpiar carrito y cerrar modal del carrito
+    window.cart = [];
+    if (typeof saveState === 'function') saveState();
+    if (typeof renderCart === 'function') renderCart();
+
+    alert("¡Pedido generado y enviado con éxito!");
+
+  } catch (error) {
+    console.error("Error en el proceso de checkout:", error);
+    alert("Ocurrió un error al procesar el pedido. Revisa la consola.");
   }
-  msgText += `Total USD: $${totalUSD.toFixed(2)}\n`;
-  msgText += `Monto Pago Móvil: Bs. ${totalBS.toFixed(2)} (Tasa BCV: ${window.bcvRate.toFixed(2)})\n`;
-  msgText += `Ref Pago Móvil: ${refNum}`;
-
-  window.open(`https://wa.me/584143943252?text=${encodeURIComponent(msgText)}`, '_blank');
-
-  window.cart = [];
-  localStorage.removeItem('avocado_cart');
-  updateCartUI();
-  document.getElementById('cartModal').classList.add('hidden');
-  alert(`Pedido #${orderId} registrado.`);
 };
 
 // ==========================================
