@@ -1293,12 +1293,11 @@ window.displayInventoryScreen = async function() {
     productos = window.products || [];
   }
 
-  // 2. Buscar el modal del reporte por ID alternativo o por el título que contiene ("Reporte General de Inventario")
+  // 2. Buscar el modal del reporte en el DOM
   let modal = document.getElementById('inventoryReportModal') || 
               document.getElementById('inventoryScreenModal') || 
               document.getElementById('modalReporteInventario');
 
-  // Si no lo encuentra por ID, lo buscamos buscando el texto del título dentro de las ventanas flotantes
   if (!modal) {
     const elementosDiv = document.querySelectorAll('div');
     for (let div of elementosDiv) {
@@ -1314,7 +1313,7 @@ window.displayInventoryScreen = async function() {
     return;
   }
 
-  // 3. Encontrar el <tbody> dentro del modal encontrado
+  // 3. Encontrar el <tbody> dentro del modal
   const tbody = modal.querySelector('tbody');
   if (!tbody) {
     console.error("El modal se encontró, pero la tabla no tiene un elemento <tbody>.");
@@ -1324,12 +1323,13 @@ window.displayInventoryScreen = async function() {
   // 4. Limpiar y rellenar la tabla con los datos reales
   tbody.innerHTML = '';
   let totalUnidades = 0;
+  const tasaBcv = window.currentBcvRate || 857.89; // Tomamos la tasa actual de la interfaz o la guardada globalmente
 
   productos.forEach(prod => {
     const stockVal = parseInt(prod.stock || 0);
     totalUnidades += stockVal;
     const precioUsd = parseFloat(prod.price || 0);
-    const tasaBcv = window.currentBcvRate || 1;
+    const precioBs = precioUsd * tasaBcv;
     
     tbody.innerHTML += `
       <tr style="border-bottom: 1px solid #f0f0f0;">
@@ -1338,19 +1338,52 @@ window.displayInventoryScreen = async function() {
         <td style="padding: 10px;">${prod.category}</td>
         <td style="padding: 10px;">${prod.branch}</td>
         <td style="padding: 10px;">$${precioUsd.toFixed(2)}</td>
-        <td style="padding: 10px;">Bs. ${(precioUsd * tasaBcv).toFixed(2)}</td>
+        <td style="padding: 10px;">Bs. ${precioBs.toFixed(2)}</td>
         <td style="padding: 10px; font-weight: bold;">${stockVal}</td>
       </tr>
     `;
   });
 
-  // 5. Actualizar contadores totales si existen
-  const totalProductosElem = document.getElementById('totalProductsCount');
-  const totalUnidadesElem = document.getElementById('totalUnitsCount');
+  // 5. Rellenar fecha actual y tasa BCV en el encabezado del reporte de forma dinámica
+  const fechaActual = new Date().toLocaleDateString('es-VE', { year: 'numeric', month: '2-digit', day: '2-digit' });
+  
+  // Buscamos los textos de Fecha y Tasa dentro del modal para actualizarlos
+  const modalTextos = modal.querySelectorAll('div, span');
+  modalTextos.forEach(el => {
+    if (el.innerText && el.innerText.includes('Fecha:')) {
+      el.innerText = `Fecha: ${fechaActual}`;
+    }
+    if (el.innerText && el.innerText.includes('Tasa BCV:')) {
+      el.innerText = `Tasa BCV: Bs. ${tasaBcv}`;
+    }
+  });
+
+  // 6. Actualizar contadores totales (Productos y Unidades)
+  const totalProductosElem = document.getElementById('totalProductsCount') || modal.querySelector('#totalProductsCount');
+  const totalUnidadesElem = document.getElementById('totalUnitsCount') || modal.querySelector('#totalUnitsCount');
+  
   if (totalProductosElem) totalProductosElem.innerText = productos.length;
   if (totalUnidadesElem) totalUnidadesElem.innerText = totalUnidades;
 
-  // 6. Mostrar el modal en pantalla
+  // Si los contadores usan un formato de texto general dentro del modal:
+  modalTextos.forEach(el => {
+    if (el.innerText && el.innerText.includes('Total Productos:')) {
+      el.innerHTML = `Total Productos: <b>${productos.length}</b> &nbsp;&nbsp;&nbsp;&nbsp; Unidades Totales: <b>${totalUnidades}</b>`;
+    }
+  });
+
+  // 7. Activar los botones de cierre ("Cerrar", la "X" superior y fuera del modal)
+  const botonesCerrar = modal.querySelectorAll('button, span');
+  botonesCerrar.forEach(btn => {
+    if (btn.innerText && (btn.innerText.trim() === 'Cerrar' || btn.innerText.trim() === '✕')) {
+      btn.onclick = () => {
+        modal.style.display = 'none';
+        modal.classList.add('hidden');
+      };
+    }
+  });
+
+  // 8. Mostrar el modal en pantalla
   modal.style.display = 'block';
   modal.classList.remove('hidden');
 };
