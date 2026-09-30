@@ -1276,66 +1276,68 @@ window.deleteSeller = function(idOrIndex) {
     }
   }
 };
-window.openInventoryReport = async function() {
+window.displayInventoryScreen = async function() {
   const client = getSupabaseClient();
-  let productosParaReporte = window.products || [];
+  let productos = [];
 
-  // Si el arreglo global está vacío, intentamos buscar en Supabase
-  if (productosParaReporte.length === 0 && client) {
+  // 1. Obtener los productos directamente de Supabase
+  if (client) {
     const { data, error } = await client.from('products').select('*');
     if (!error && data) {
-      productosParaReporte = data;
-      window.products = data;
+      productos = data;
+      window.products = data; // Sincronizamos el arreglo global
+    } else {
+      console.error("Error al consultar productos para la pantalla de inventario:", error);
     }
+  } else {
+    productos = window.products || [];
   }
 
-  // Buscamos el cuerpo de la tabla del reporte (probando los nombres más comunes)
-  let tbody = document.getElementById('inventoryReportTableBody') || 
-              document.getElementById('reportTableBody') || 
-              document.querySelector('#inventoryReportModal tbody');
-
-  if (!tbody) {
-    console.error("No se encontró el cuerpo de la tabla del reporte en el DOM.");
+  // 2. Localizar el modal o contenedor de la pantalla de inventario
+  const modal = document.getElementById('inventoryReportModal') || document.getElementById('inventoryScreenModal');
+  if (!modal) {
+    console.error("No se encontró el contenedor del reporte de inventario en el DOM.");
     return;
   }
 
+  // 3. Encontrar el <tbody> de forma segura dentro del modal
+  const tbody = modal.querySelector('tbody');
+  if (!tbody) {
+    console.error("No se encontró el cuerpo de la tabla (tbody) dentro del modal.");
+    return;
+  }
+
+  // 4. Limpiar y rellenar la tabla con los datos reales
   tbody.innerHTML = '';
   let totalUnidades = 0;
 
-  productosParaReporte.forEach(prod => {
+  productos.forEach(prod => {
     const stockVal = parseInt(prod.stock || 0);
     totalUnidades += stockVal;
+    const precioUsd = parseFloat(prod.price || 0);
+    const tasaBcv = window.currentBcvRate || 1;
     
     tbody.innerHTML += `
-      <tr>
-        <td style="padding: 8px; border-bottom: 1px solid #eee;">${prod.sku || 'N/A'}</td>
-        <td style="padding: 8px; border-bottom: 1px solid #eee;">${prod.name}</td>
-        <td style="padding: 8px; border-bottom: 1px solid #eee;">${prod.category}</td>
-        <td style="padding: 8px; border-bottom: 1px solid #eee;">${prod.branch}</td>
-        <td style="padding: 8px; border-bottom: 1px solid #eee;">$${parseFloat(prod.price).toFixed(2)}</td>
-        <td style="padding: 8px; border-bottom: 1px solid #eee;">Bs. ${(prod.price * (window.currentBcvRate || 1)).toFixed(2)}</td>
-        <td style="padding: 8px; border-bottom: 1px solid #eee;">${stockVal}</td>
+      <tr style="border-bottom: 1px solid #f0f0f0;">
+        <td style="padding: 10px;">${prod.sku || 'N/A'}</td>
+        <td style="padding: 10px;">${prod.name}</td>
+        <td style="padding: 10px;">${prod.category}</td>
+        <td style="padding: 10px;">${prod.branch}</td>
+        <td style="padding: 10px;">$${precioUsd.toFixed(2)}</td>
+        <td style="padding: 10px;">Bs. ${(precioUsd * tasaBcv).toFixed(2)}</td>
+        <td style="padding: 10px; font-weight: bold;">${stockVal}</td>
       </tr>
     `;
   });
 
-  // Actualizar contadores totales en el modal
-  const countElem = document.getElementById('totalProductsCount') || document.getElementById('totalProducts');
-  const unitsElem = document.getElementById('totalUnitsCount') || document.getElementById('totalUnits');
+  // 5. Actualizar contadores totales en el reporte
+  const totalProductosElem = document.getElementById('totalProductsCount');
+  const totalUnidadesElem = document.getElementById('totalUnitsCount');
   
-  if (countElem) countElem.innerText = productosParaReporte.length;
-  if (unitsElem) unitsElem.innerText = totalUnidades;
+  if (totalProductosElem) totalProductosElem.innerText = productos.length;
+  if (totalUnidadesElem) totalUnidadesElem.innerText = totalUnidades;
 
-  // Actualizar fecha y tasa BCV en la cabecera del reporte si existen
-  const dateElem = document.getElementById('reportDate');
-  const bcvElem = document.getElementById('reportBcvRate');
-  if (dateElem) dateElem.innerText = new Date().toLocaleDateString();
-  if (bcvElem && window.currentBcvRate) bcvElem.innerText = window.currentBcvRate;
-
-  // Mostrar el modal (compatible con estilos estilo display block o clases CSS)
-  const modal = document.getElementById('inventoryReportModal');
-  if (modal) {
-    modal.style.display = 'block';
-    modal.classList.remove('hidden');
-  }
+  // 6. Mostrar el modal en pantalla
+  modal.style.display = 'block';
+  modal.classList.remove('hidden');
 };
