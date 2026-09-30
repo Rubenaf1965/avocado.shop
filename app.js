@@ -1401,3 +1401,85 @@ window.descontarStockSupabase = async function(productosVendidos) {
     }
   }
 };
+// --- GESTIÓN DE ÓRDENES Y FACTURACIÓN ---
+
+window.viewOrderModal = function(orderId) {
+  // Buscar la orden en el arreglo global de órdenes
+  const order = (window.orders || []).find(o => o.id === orderId || o.code === orderId);
+  if (!order) {
+    alert("No se encontró la información de la orden.");
+    return;
+  }
+
+  // Lógica para desplegar el modal de detalles de la orden
+  const modal = document.getElementById('orderDetailModal') || document.getElementById('viewOrderModal');
+  if (modal) {
+    modal.style.display = 'block';
+    modal.classList.remove('hidden');
+    // Rellenar datos si existen elementos correspondientes
+    const content = document.getElementById('orderDetailsContent');
+    if (content) {
+      content.innerHTML = `
+        <p><b>Orden:</b> ${order.code || order.id}</p>
+        <p><b>Cliente:</b> ${order.clientName || 'N/A'}</p>
+        <p><b>Total:</b> $${order.total || 0}</p>
+        <p><b>Estado:</b> ${order.status || 'Procesado'}</p>
+      `;
+    }
+  } else {
+    alert(`Detalles de la Orden ${order.code || orderId} - Cliente: ${order.clientName || 'N/A'} - Total: $${order.total || 0}`);
+  }
+};
+
+window.deleteOrder = async function(orderId) {
+  if (!confirm("¿Estás seguro de que deseas eliminar esta orden?")) return;
+
+  const client = getSupabaseClient();
+  if (client) {
+    const { error } = await client.from('orders').delete().eq('id', orderId);
+    if (error) {
+      alert("Error al eliminar la orden en Supabase: " + error.message);
+      return;
+    }
+  }
+
+  // Remover del arreglo local
+  window.orders = (window.orders || []).filter(o => o.id !== orderId && o.code !== orderId);
+  
+  if (typeof renderOrders === 'function') renderOrders();
+  if (typeof updateDashboardMetrics === 'function') updateDashboardMetrics();
+  alert("🗑️ Orden eliminada exitosamente.");
+};
+
+window.changeOrderStatus = async function(orderId, newStatus) {
+  const client = getSupabaseClient();
+  
+  // Encontrar la orden localmente
+  const order = (window.orders || []).find(o => o.id === orderId || o.code === orderId);
+  if (order) {
+    order.status = newStatus;
+
+    // Si la orden cambia a procesada/facturada, descontar inventario automáticamente
+    if (newStatus === 'Procesado' || newStatus === 'Completado') {
+      if (order.items && Array.isArray(order.items)) {
+        for (let item of order.items) {
+          if (client) {
+            // Consultar stock actual en Supabase
+            const { data: prodData } = await client.from('products').select('stock').eq('id', item.id).single();
+            if (prodData) {
+              const nuevoStock = Math.max(0, prodData.stock - (item.quantity || 1));
+              await client.from('products').update({ stock: nuevoStock }).eq('id', item.id);
+            }
+          }
+        }
+      }
+    }
+
+    if (client) {
+      await client.from('orders').update({ status: newStatus }).eq('id', orderId);
+    }
+  }
+
+  if (typeof renderOrders === 'function') renderOrders();
+  if (typeof updateDashboardMetrics === 'function') updateDashboardMetrics();
+};
