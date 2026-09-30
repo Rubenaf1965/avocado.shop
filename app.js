@@ -1591,18 +1591,37 @@ window.searchOrderTracking = function() {
 };
 window.toggleDeliveryAddress = function(selectElement) {
   const selectedValue = selectElement.value;
-  let addressContainer = document.getElementById('deliveryAddressContainer');
   
+  // Contenedores en el formulario del carrito
+  const addressContainer = document.getElementById('deliveryAddressContainer');
+  // Ajusta el ID según cómo se llame el contenedor o el div que envuelve al selector/label de sucursal
+  const branchContainer = document.getElementById('branchContainer') || document.querySelector('.branch-selection-container'); 
+
   if (!addressContainer) return;
 
-  if (selectedValue === 'delivery') {
+  // Verificamos si es delivery (ya sea por valor 'delivery' o texto 'Envío por Delivery')
+  const isDelivery = selectedValue === 'delivery' || selectedValue.toLowerCase().includes('delivery');
+
+  if (isDelivery) {
+    // Mostrar campo de dirección
     addressContainer.innerHTML = `
       <label class="block text-[11px] font-bold text-gray-700 mb-1">Dirección Exacta de Delivery:</label>
       <input type="text" id="deliveryAddressInput" placeholder="Ej: Urbanización, Calle, Casa/Edificio..." class="w-full border rounded-lg p-2 text-xs outline-none bg-white font-medium">
     `;
     addressContainer.style.display = 'block';
+
+    // Ocultar la opción de sucursal
+    if (branchContainer) {
+      branchContainer.style.display = 'none';
+    }
   } else {
+    // Ocultar campo de dirección si es retiro en tienda
     addressContainer.style.display = 'none';
     addressContainer.innerHTML = '';
+
+    // Mostrar de nuevo la opción de sucursal
+    if (branchContainer) {
+      branchContainer.style.display = 'block';
+    }
   }
 };
