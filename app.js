@@ -1285,7 +1285,7 @@ window.displayInventoryScreen = async function() {
     const { data, error } = await client.from('products').select('*');
     if (!error && data) {
       productos = data;
-      window.products = data; // Sincronizamos el arreglo global
+      window.products = data;
     } else {
       console.error("Error al consultar productos para la pantalla de inventario:", error);
     }
@@ -1293,17 +1293,31 @@ window.displayInventoryScreen = async function() {
     productos = window.products || [];
   }
 
-  // 2. Localizar el modal o contenedor de la pantalla de inventario
-  const modal = document.getElementById('inventoryReportModal') || document.getElementById('inventoryScreenModal');
+  // 2. Buscar el modal del reporte por ID alternativo o por el título que contiene ("Reporte General de Inventario")
+  let modal = document.getElementById('inventoryReportModal') || 
+              document.getElementById('inventoryScreenModal') || 
+              document.getElementById('modalReporteInventario');
+
+  // Si no lo encuentra por ID, lo buscamos buscando el texto del título dentro de las ventanas flotantes
   if (!modal) {
-    console.error("No se encontró el contenedor del reporte de inventario en el DOM.");
+    const elementosDiv = document.querySelectorAll('div');
+    for (let div of elementosDiv) {
+      if (div.innerText && div.innerText.includes('Reporte General de Inventario')) {
+        modal = div.closest('.fixed') || div.closest('.modal') || div.parentElement;
+        break;
+      }
+    }
+  }
+
+  if (!modal) {
+    console.error("No se pudo localizar el contenedor visual del reporte en el HTML.");
     return;
   }
 
-  // 3. Encontrar el <tbody> de forma segura dentro del modal
+  // 3. Encontrar el <tbody> dentro del modal encontrado
   const tbody = modal.querySelector('tbody');
   if (!tbody) {
-    console.error("No se encontró el cuerpo de la tabla (tbody) dentro del modal.");
+    console.error("El modal se encontró, pero la tabla no tiene un elemento <tbody>.");
     return;
   }
 
@@ -1330,10 +1344,9 @@ window.displayInventoryScreen = async function() {
     `;
   });
 
-  // 5. Actualizar contadores totales en el reporte
+  // 5. Actualizar contadores totales si existen
   const totalProductosElem = document.getElementById('totalProductsCount');
   const totalUnidadesElem = document.getElementById('totalUnitsCount');
-  
   if (totalProductosElem) totalProductosElem.innerText = productos.length;
   if (totalUnidadesElem) totalUnidadesElem.innerText = totalUnidades;
 
