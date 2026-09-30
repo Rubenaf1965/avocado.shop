@@ -1280,20 +1280,16 @@ window.displayInventoryScreen = async function() {
   const client = getSupabaseClient();
   let productos = [];
 
-  // 1. Obtener los productos directamente de Supabase
   if (client) {
     const { data, error } = await client.from('products').select('*');
     if (!error && data) {
       productos = data;
       window.products = data;
-    } else {
-      console.error("Error al consultar productos para la pantalla de inventario:", error);
     }
   } else {
     productos = window.products || [];
   }
 
-  // 2. Buscar el modal del reporte de forma segura
   let modal = document.getElementById('inventoryReportModal') || 
               document.getElementById('inventoryScreenModal') || 
               document.getElementById('modalReporteInventario');
@@ -1308,19 +1304,11 @@ window.displayInventoryScreen = async function() {
     }
   }
 
-  if (!modal) {
-    console.error("No se pudo localizar el contenedor visual del reporte en el HTML.");
-    return;
-  }
+  if (!modal) return;
 
-  // 3. Encontrar el <tbody> dentro del modal
   const tbody = modal.querySelector('tbody');
-  if (!tbody) {
-    console.error("El modal se encontró, pero la tabla no tiene un elemento <tbody>.");
-    return;
-  }
+  if (!tbody) return;
 
-  // 4. Limpiar y rellenar la tabla con los datos reales
   tbody.innerHTML = '';
   let totalUnidades = 0;
   const tasaBcv = window.currentBcvRate || 857.89;
@@ -1344,13 +1332,10 @@ window.displayInventoryScreen = async function() {
     `;
   });
 
-  // 5. Actualizar la fecha y la tasa BCV EXCLUSIVAMENTE dentro del encabezado del modal
+  // Asignar fecha y tasa de forma directa buscando los textos en el modal
   const fechaActual = new Date().toLocaleDateString('es-VE', { year: 'numeric', month: '2-digit', day: '2-digit' });
   
-  // Buscamos elementos específicos dentro del modal para evitar modificar la página principal
-  const modalTextos = modal.querySelectorAll('span, p, div');
-  modalTextos.forEach(el => {
-    // Verificamos que sea un nodo de texto directo o corto para evitar sobreescribir contenedores grandes
+  modal.querySelectorAll('span, p, div').forEach(el => {
     if (el.children.length === 0 && el.innerText) {
       if (el.innerText.includes('Fecha:')) {
         el.innerText = `Fecha: ${fechaActual}`;
@@ -1358,28 +1343,16 @@ window.displayInventoryScreen = async function() {
       if (el.innerText.includes('Tasa BCV:')) {
         el.innerText = `Tasa BCV: Bs. ${tasaBcv}`;
       }
+      if (el.innerText.includes('Total Productos:')) {
+        el.innerHTML = `Total Productos: <b>${productos.length}</b> &nbsp;&nbsp;&nbsp;&nbsp; Unidades Totales: <b>${totalUnidades}</b>`;
+      }
     }
   });
 
-  // 6. Actualizar contadores totales de productos y unidades
-  const totalProductosElem = modal.querySelector('#totalProductsCount');
-  const totalUnidadesElem = modal.querySelector('#totalUnitsCount');
-  
-  if (totalProductosElem) totalProductosElem.innerText = productos.length;
-  if (totalUnidadesElem) totalUnidadesElem.innerText = totalUnidades;
-
-  // Si el resumen usa texto plano dentro del modal:
-  modalTextos.forEach(el => {
-    if (el.children.length === 0 && el.innerText && el.innerText.includes('Total Productos:')) {
-      el.innerHTML = `Total Productos: <b>${productos.length}</b> &nbsp;&nbsp;&nbsp;&nbsp; Unidades Totales: <b>${totalUnidades}</b>`;
-    }
-  });
-
-  // 7. Activar los botones de cierre ("Cerrar" y la "X") de forma segura
-  const botonesCerrar = modal.querySelectorAll('button, span');
+  // Asignar eventos de cierre al botón "Cerrar" y a la "X" superior
+  const botonesCerrar = modal.querySelectorAll('button, svg, path');
   botonesCerrar.forEach(btn => {
-    if (btn.innerText && (btn.innerText.trim() === 'Cerrar' || btn.innerText.trim() === '✕')) {
-      // Evitamos duplicar eventos limpiando la referencia previa
+    if (btn.innerText && btn.innerText.trim() === 'Cerrar') {
       btn.onclick = (e) => {
         e.preventDefault();
         modal.style.display = 'none';
@@ -1388,7 +1361,43 @@ window.displayInventoryScreen = async function() {
     }
   });
 
-  // 8. Mostrar el modal en pantalla
+  const btnX = modal.querySelector('button.absolute, button svg, .close-modal');
+  if (btnX) {
+    const closeBtnElement = btnX.closest('button') || btnX;
+    closeBtnElement.onclick = (e) => {
+      e.preventDefault();
+      modal.style.display = 'none';
+      modal.classList.add('hidden');
+    };
+  }
+
   modal.style.display = 'block';
   modal.classList.remove('hidden');
+};
+window.descontarStockSupabase = async function(productosVendidos) {
+  const client = getSupabaseClient();
+  if (!client) return;
+
+  for (let item of productosVendidos) {
+    // 1. Consultar el stock actual del producto
+    const { data: productoActual, error: errFetch } = await client
+      .from('products')
+      .select('stock')
+      .eq('id', item.id)
+      .single();
+
+    if (!errFetch && productoActual) {
+      const nuevoStock = Math.max(0, productoActual.stock - item.quantity);
+
+      // 2. Actualizar con el nuevo stock reducido
+      const { error: errUpdate } = await client
+        .from('products')
+        .update({ stock: nuevoStock })
+        .eq('id', item.id);
+
+      if (errUpdate) {
+        console.error("Error al actualizar stock en Supabase:", errUpdate.message);
+      }
+    }
+  }
 };
