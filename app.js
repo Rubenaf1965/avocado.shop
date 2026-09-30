@@ -566,10 +566,10 @@ window.processCheckout = async function() {
     
     window.open(whatsappUrl, '_blank');
 
-    // Limpiar carrito y cerrar modal del carrito
-    window.cart = [];
-    if (typeof saveState === 'function') saveState();
-    if (typeof renderCart === 'function') renderCart();
+   // Limpiar carrito y almacenamiento local
+window.cart = [];
+localStorage.removeItem('avocado_cart'); // 👈 Vital para borrarlo del almacenamiento
+if (typeof updateCartUI === 'function') updateCartUI(); // 👈 Usar la función correcta
 
 // 👉 AGREGAR AQUÍ: Cerrar el modal del carrito en pantalla
     const cartModal = document.getElementById('cartModal') || document.querySelector('.cart-modal') || document.getElementById('carritoModal');
@@ -1496,7 +1496,7 @@ window.changeOrderStatus = async function(orderIdOrIdentifier, newStatus) {
   // Actualizar estado localmente
   order.status = newStatus;
 
-  // Si la orden pasa a Procesado, Completado o Entregado, descontar stock de los productos
+  // Si la orden pasa a un estado avanzado, descontar stock
   if (newStatus === 'Procesado' || newStatus === 'Completado' || newStatus === 'Entregado') {
     const itemsList = order.items || order.items_json;
     if (itemsList && Array.isArray(itemsList)) {
@@ -1530,11 +1530,11 @@ window.changeOrderStatus = async function(orderIdOrIdentifier, newStatus) {
     }
   }
 
-  // Sincronizar el cambio de estado en la tabla 'orders' de Supabase
+  // Sincronizar el cambio de estado en la tabla 'orders' de Supabase de forma segura
   if (client) {
-    // Si el identificador tiene formato UUID largo (más de 30 caracteres), es el ID interno. Si empieza con AVO-, es order_id.
-    const isUuid = String(orderIdOrIdentifier).length > 25 && !String(orderIdOrIdentifier).startsWith('AVO-');
-    const queryField = isUuid ? 'id' : 'order_id';
+    // Si el identificador empieza con 'AVO-', forzamos a buscar por 'order_id'
+    const isAvsCode = String(orderIdOrIdentifier).startsWith('AVO-');
+    const queryField = isAvsCode ? 'order_id' : 'id';
     const targetValue = order.orderId || order.order_id || orderIdOrIdentifier;
 
     const { error: updateError } = await client
@@ -1547,9 +1547,9 @@ window.changeOrderStatus = async function(orderIdOrIdentifier, newStatus) {
     }
   }
 
-  // Guardar cambios locales y refrescar vistas y métricas del dashboard
+  // Guardar cambios locales y refrescar vistas sin errores
   saveState();
-  if (window.products && typeof renderProducts === 'function') renderProducts();
+  if (typeof renderStoreProducts === 'function') renderStoreProducts(); // 👈 Corrección clave (evita el error de length)
   if (typeof updateDashboardMetrics === 'function') updateDashboardMetrics();
   if (typeof filterAdminView === 'function') filterAdminView();
 };
