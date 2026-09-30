@@ -1617,3 +1617,109 @@ window.displayOrderDetails = function(orderIdOrIdentifier) {
 
   document.body.appendChild(modalContainer);
 };
+import React from 'react';
+
+export default function OrderModal({ order, isOpen, onClose }) {
+  if (!isOpen || !order) return null;
+
+  // Función para disparar la impresión del comprobante/factura
+  const handlePrintInvoice = () => {
+    window.print();
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm print:bg-white print:fixed print:inset-0">
+      {/* Contenedor del Modal */}
+      <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg mx-4 overflow-hidden print:shadow-none print:w-full print:max-w-none print:m-0">
+        
+        {/* Cabecera del Modal (Oculta al imprimir) */}
+        <div className="flex justify-between items-center bg-slate-900 text-white px-6 py-4 print:hidden">
+          <h3 className="text-lg font-semibold">Detalles de Orden: {order.id}</h3>
+          <button 
+            onClick={onClose}
+            className="text-slate-400 hover:text-white text-xl font-bold px-2"
+          >
+            &times;
+          </button>
+        </div>
+
+        {/* Cuerpo de la Factura / Orden (Se imprime esta sección) */}
+        <div className="p-6 space-y-4 text-slate-700 print:p-8">
+          
+          {/* Encabezado para impresión (Solo visible al imprimir) */}
+          <div className="hidden print:block text-center mb-6">
+            <h1 className="text-2xl font-bold text-slate-900">Avocado Shop</h1>
+            <p className="text-sm text-slate-500">Insumos de uñas, cejas y pestañas</p>
+            <p className="text-xs text-slate-400 mt-1">Comprobante de Venta / Factura</p>
+            <hr className="my-3 border-slate-200" />
+          </div>
+
+          {/* Información General */}
+          <div className="space-y-1.5 text-sm">
+            <p><strong className="text-slate-900">Cliente:</strong> {order.client}</p>
+            <p><strong className="text-slate-900">Tipo de Entrega:</strong> {order.deliveryType}</p>
+            <p>
+              <strong className="text-slate-900">Estado:</strong>{' '}
+              <span className="inline-block px-2 py-0.5 text-xs font-medium bg-emerald-100 text-emerald-800 rounded-full">
+                {order.status}
+              </span>
+            </p>
+            <p><strong className="text-slate-900">Referencia de Pago:</strong> {order.paymentRef || 'N/A'}</p>
+          </div>
+
+          <hr className="border-slate-200" />
+
+          {/* Listado de Productos */}
+          <div>
+            <h4 className="text-sm font-semibold text-slate-900 mb-2">Productos:</h4>
+            <div className="border border-slate-200 rounded-lg overflow-hidden">
+              <table className="w-full text-left text-sm">
+                <thead className="bg-slate-50 border-b border-slate-200 text-slate-700">
+                  <tr>
+                    <th className="p-2.5">Descripción</th>
+                    <th className="p-2.5 text-right">Subtotal</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {order.items.map((item, index) => (
+                    <tr key={index}>
+                      <td className="p-2.5">{item.name} (x{item.quantity})</td>
+                      <td className="p-2.5 text-right font-medium">${item.price.toFixed(2)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* Total a Pagar */}
+          <div className="flex justify-between items-center pt-2 border-t border-slate-200 text-base font-bold text-slate-900">
+            <span>Total a Pagar:</span>
+            <span className="text-emerald-600">${order.total.toFixed(2)}</span>
+          </div>
+
+        </div>
+
+        {/* Pie de Página / Botones de Acción (Oculto al imprimir) */}
+        <div className="bg-slate-50 px-6 py-4 flex justify-end gap-3 border-t border-slate-200 print:hidden">
+          <button
+            onClick={onClose}
+            className="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 font-medium rounded-lg text-sm transition"
+          >
+            Cerrar
+          </button>
+          <button
+            onClick={handlePrintInvoice}
+            className="px-4 py-2 bg-emerald-700 hover:bg-emerald-800 text-white font-medium rounded-lg text-sm flex items-center gap-2 transition shadow-sm"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 9V2h12v7M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2m-4 0v4H8v-4m4-8h4m-4 4h4" />
+            </svg>
+            Generar Factura e Imprimir
+          </button>
+        </div>
+
+      </div>
+    </div>
+  );
+}

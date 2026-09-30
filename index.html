@@ -32,8 +32,28 @@
   }
 }
   </style>
+
 </head>
 <body class="text-gray-800">
+
+<style>
+  @media print {
+    body * {
+      visibility: hidden;
+    }
+    /* Reemplaza '.modal-orden' con la clase o ID de tu contenedor de detalles de orden */
+    .modal-orden, .modal-orden * {
+      visibility: visible;
+    }
+    .modal-orden {
+      position: absolute;
+      left: 0;
+      top: 0;
+      width: 100%;
+      background: white !important;
+    }
+  }
+</style>
 
   <header class="sticky top-0 z-40 bg-white/90 backdrop-blur-md border-b border-gray-100 shadow-sm">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between gap-4">
