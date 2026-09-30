@@ -509,7 +509,7 @@ window.processCheckout = async () => {
   const buyerName = document.getElementById('buyerName').value.trim();
   const refNum = document.getElementById('pmReference').value.trim();
   const deliveryOption = document.getElementById('deliveryOption').value;
-  const deliveryAddress = document.getElementById('deliveryAddress').value.trim();
+  const deliveryAddress = document.getElementById('deliveryAddressInput') ? document.getElementById('deliveryAddressInput').value : '';
   const selectedBranch = document.getElementById('cartBranchSelect').value;
 
   if (!buyerName) return alert('Por favor ingrese el nombre del comprador.');
@@ -1587,5 +1587,30 @@ window.searchOrderTracking = function() {
     alert(`¡Orden Encontrada!\n\n• Código: ${foundOrder.orderId || foundOrder.order_id}\n• Cliente: ${foundOrder.clientName || foundOrder.client_name}\n• Estado: ${foundOrder.status}\n• Total: $${foundOrder.total}`);
   } else {
     alert("No se encontró ninguna orden registrada con el código: " + code);
+  }
+};
+window.toggleDeliveryAddress = function(selectElement) {
+  const selectedValue = selectElement.value;
+  
+  // Buscar o crear el contenedor para el input de la dirección de envío
+  let addressContainer = document.getElementById('deliveryAddressContainer');
+  
+  if (!addressContainer) {
+    // Si no existe en el HTML, lo creamos justo debajo del selector de entrega
+    addressContainer = document.createElement('div');
+    addressContainer.id = 'deliveryAddressContainer';
+    addressContainer.className = 'mt-3';
+    selectElement.parentNode.insertAdjacentElement('afterend', addressContainer);
+  }
+
+  if (selectedValue.toLowerCase().includes('delivery') || selectedValue === 'Envío por Delivery') {
+    addressContainer.innerHTML = `
+      <label class="block text-xs font-semibold text-gray-600 mb-1">Dirección Exacta de Delivery:</label>
+      <input type="text" id="deliveryAddressInput" placeholder="Ej: Urbanización, Calle, Casa/Edificio, Apt..." class="w-full p-2 border rounded-md text-sm">
+    `;
+    addressContainer.style.display = 'block';
+  } else {
+    addressContainer.style.display = 'none';
+    addressContainer.innerHTML = '';
   }
 };
