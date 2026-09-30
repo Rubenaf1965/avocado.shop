@@ -1678,10 +1678,10 @@ window.displayOrderDetails = function(orderId) {
 };
 // Ejemplo dentro del renderizado de tu tabla de órdenes:
 const actionButtons = `
-  <button onclick="displayOrderDetails('${order.orderId || order.id}')" class="bg-blue-600 text-white px-2 py-1 rounded text-xs font-medium hover:bg-blue-700 transition mr-1">
+  <button onclick="displayOrderDetails('${o.orderId || o.id}')" class="bg-blue-600 text-white px-2 py-1 rounded text-xs font-medium hover:bg-blue-700 transition mr-1">
     Ver en Pantalla
   </button>
-  <button onclick="changeOrderStatus('${order.orderId || order.id}', 'Procesado')" class="bg-emerald-600 text-white px-2 py-1 rounded text-xs font-medium hover:bg-emerald-700 transition">
+  <button onclick="changeOrderStatus('${o.orderId || o.id}', 'Procesado')" class="bg-emerald-600 text-white px-2 py-1 rounded text-xs font-medium hover:bg-emerald-700 transition">
     Procesar
   </button>
 `;
