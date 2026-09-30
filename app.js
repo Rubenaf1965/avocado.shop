@@ -1379,28 +1379,24 @@ window.descontarStockSupabase = async function(productosVendidos) {
   if (!client) return;
 
   for (let item of productosVendidos) {
-    // 1. Consultar el stock actual del producto
-    const { data: productoActual, error: errFetch } = await client
+    // 1. Consultar el stock actual del producto en Supabase[cite: 17]
+    const { data: productoActual, error: fetchError } = await client
       .from('products')
-      .select('stock')
+      .select('stock, id')
       .eq('id', item.id)
       .single();
 
-    if (!errFetch && productoActual) {
-      const nuevoStock = Math.max(0, productoActual.stock - item.quantity);
-
-      // 2. Actualizar con el nuevo stock reducido
-      const { error: errUpdate } = await client
+    if (!fetchError && productoActual) {
+      const nuevoStock = Math.max(0, productoActual.stock - item.qty);
+      // 2. Actualizar el inventario descontando las unidades vendidas[cite: 17]
+      await client
         .from('products')
         .update({ stock: nuevoStock })
         .eq('id', item.id);
-
-      if (errUpdate) {
-        console.error("Error al actualizar stock en Supabase:", errUpdate.message);
-      }
     }
   }
 };
+
 // --- GESTIÓN DE ÓRDENES Y FACTURACIÓN ---
 
 window.viewOrderModal = function(orderId) {
