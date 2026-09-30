@@ -1625,3 +1625,63 @@ window.toggleDeliveryAddress = function(selectElement) {
     }
   }
 };
+window.displayOrderDetails = function(orderId) {
+  const orders = window.orders || [];
+  const order = orders.find(o => o.id == orderId || o.orderId == orderId || o.order_id == orderId);
+
+  if (!order) {
+    alert("No se encontró la información de la orden.");
+    return;
+  }
+
+  // Generar lista de productos de la orden
+  const items = order.items || order.items_json || [];
+  let itemsHtml = items.map(item => `
+    <div class="flex justify-between border-b py-1 text-xs">
+      <span>${item.name || item.product_name || 'Producto'} (x${item.qty || item.quantity || 1})</span>
+      <span>$${Number((item.price || 0) * (item.qty || item.quantity || 1)).toFixed(2)}</span>
+    </div>
+  `).join('');
+
+  // Crear o reutilizar un modal flotante en pantalla
+  let modal = document.getElementById('orderDetailsModal');
+  if (!modal) {
+    modal = document.createElement('div');
+    modal.id = 'orderDetailsModal';
+    modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4';
+    document.body.appendChild(modal);
+  }
+
+  modal.innerHTML = `
+    <div class="bg-white rounded-xl shadow-xl max-w-md w-full p-6 relative">
+      <button onclick="document.getElementById('orderDetailsModal').remove()" class="absolute top-3 right-3 text-gray-500 hover:text-black font-bold text-lg">&times;</button>
+      <h3 class="text-base font-bold text-gray-800 mb-3">Detalles de Orden: ${order.orderId || order.order_id}</h3>
+      <div class="space-y-2 text-xs text-gray-600 mb-4">
+        <p><strong>Cliente:</strong> ${order.clientName || order.client_name}</p>
+        <p><strong>Tipo de Entrega:</strong> ${order.deliveryType || order.delivery_type || 'Retiro'}</p>
+        <p><strong>Estado:</strong> <span class="px-2 py-0.5 bg-green-100 text-green-700 rounded-full font-semibold">${order.status}</span></p>
+        <p><strong>Referencia de Pago:</strong> ${order.paymentReference || order.payment_reference || 'N/A'}</p>
+      </div>
+      <div class="border-t pt-2 mb-4">
+        <h4 class="font-bold text-xs text-gray-700 mb-2">Productos:</h4>
+        <div class="max-h-40 overflow-y-auto space-y-1">
+          ${itemsHtml}
+        </div>
+      </div>
+      <div class="flex justify-between items-center border-t pt-3 font-bold text-sm text-gray-900 mb-4">
+        <span>Total a Pagar:</span>
+        <span class="text-green-600">$${Number(order.total || 0).toFixed(2)}</span>
+      </div>
+      <button onclick="document.getElementById('orderDetailsModal').remove()" class="w-full bg-gray-800 text-white py-2 rounded-lg text-xs font-semibold hover:bg-black transition">Cerrar</button>
+    </div>
+  `;
+};
+// Ejemplo dentro del renderizado de tu tabla de órdenes:
+const actionButtons = `
+  <button onclick="displayOrderDetails('${order.orderId || order.id}')" class="bg-blue-600 text-white px-2 py-1 rounded text-xs font-medium hover:bg-blue-700 transition mr-1">
+    Ver en Pantalla
+  </button>
+  <button onclick="changeOrderStatus('${order.orderId || order.id}', 'Procesado')" class="bg-emerald-600 text-white px-2 py-1 rounded text-xs font-medium hover:bg-emerald-700 transition">
+    Procesar
+  </button>
+`;
