@@ -1456,14 +1456,17 @@ window.deleteOrder = async function(orderIdOrIdentifier) {
 window.changeOrderStatus = async function(orderIdOrIdentifier, newStatus) {
   const client = getSupabaseClient();
   
+  // Encontrar la orden localmente
   const order = (window.orders || []).find(o => o.id == orderIdOrIdentifier || o.orderId == orderIdOrIdentifier);
   if (order) {
     order.status = newStatus;
 
-    if (newStatus === 'Procesado' || newStatus === 'Completado') {
+    // Si la orden cambia a procesada/facturada, descontar inventario automáticamente
+    if (newStatus === 'Procesado' || newStatus === 'Completado' || newStatus === 'Entregado') {
       if (order.items && Array.isArray(order.items)) {
         for (let item of order.items) {
           if (client) {
+            // Consultar stock actual en Supabase usando el id del producto
             const { data: prodData } = await client.from('products').select('stock').eq('id', item.id).single();
             if (prodData) {
               const nuevoStock = Math.max(0, prodData.stock - (item.qty || item.quantity || 1));
@@ -1475,9 +1478,14 @@ window.changeOrderStatus = async function(orderIdOrIdentifier, newStatus) {
     }
 
     if (client) {
+      // Determinamos si el identificador es el ID interno de Supabase o el código AVO
       const isNumericOrUuid = !String(orderIdOrIdentifier).startsWith('AVO-');
       const queryField = isNumericOrUuid ? 'id' : 'orderId';
-      await client.from('orders').update({ status: newStatus }).eq(queryField, orderIdOrIdentifier);
+      
+      const { error } = await client.from('orders').update({ status: newStatus }).eq(queryField, orderIdOrIdentifier);
+      if (error) {
+        console.error("Error al actualizar estado en Supabase:", error.message);
+      }
     }
     saveState();
   }
