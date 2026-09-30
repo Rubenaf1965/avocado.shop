@@ -1456,7 +1456,7 @@ window.deleteOrder = async function(orderIdOrIdentifier) {
 window.changeOrderStatus = async function(orderIdOrIdentifier, newStatus) {
   const client = getSupabaseClient();
   
-  // Buscar la orden tanto por ID interno, orderId (AVO-XXXXXX) o coincidencia flexible
+  // Buscar la orden localmente
   let order = (window.orders || []).find(o => 
     o.id == orderIdOrIdentifier || 
     o.orderId == orderIdOrIdentifier || 
@@ -1471,7 +1471,7 @@ window.changeOrderStatus = async function(orderIdOrIdentifier, newStatus) {
   // Actualizar estado localmente
   order.status = newStatus;
 
-  // Si la orden pasa a Procesado, descontar stock de los productos
+  // Si la orden pasa a Procesado, Completado o Entregado, descontar stock de los productos
   if (newStatus === 'Procesado' || newStatus === 'Completado' || newStatus === 'Entregado') {
     const itemsList = order.items || order.items_json;
     if (itemsList && Array.isArray(itemsList)) {
@@ -1480,8 +1480,7 @@ window.changeOrderStatus = async function(orderIdOrIdentifier, newStatus) {
         const qtyToSubtract = Number(item.qty || item.quantity || 1);
 
         if (client && prodId) {
-          // Consultar el stock actual en Supabase
-          const { data: prodData, error: prodError } = await client
+          const { data: prodData } = await client
             .from('products')
             .select('stock, id')
             .eq('id', prodId)
@@ -1489,7 +1488,6 @@ window.changeOrderStatus = async function(orderIdOrIdentifier, newStatus) {
 
           if (prodData) {
             const nuevoStock = Math.max(0, Number(prodData.stock) - qtyToSubtract);
-            // Actualizar stock en Supabase
             await client
               .from('products')
               .update({ stock: nuevoStock })
@@ -1497,7 +1495,6 @@ window.changeOrderStatus = async function(orderIdOrIdentifier, newStatus) {
           }
         }
 
-        // Actualizar stock en el arreglo local de productos si existe
         if (window.products && Array.isArray(window.products)) {
           const localProd = window.products.find(p => p.id == prodId);
           if (localProd) {
@@ -1510,7 +1507,8 @@ window.changeOrderStatus = async function(orderIdOrIdentifier, newStatus) {
 
   // Sincronizar el cambio de estado en la tabla 'orders' de Supabase
   if (client) {
-    const isUuid = String(orderIdOrIdentifier).includes('-') && !String(orderIdOrIdentifier).startsWith('AVO-');
+    // Si el identificador tiene formato UUID largo (más de 30 caracteres), es el ID interno. Si empieza con AVO-, es order_id.
+    const isUuid = String(orderIdOrIdentifier).length > 25 && !String(orderIdOrIdentifier).startsWith('AVO-');
     const queryField = isUuid ? 'id' : 'order_id';
     const targetValue = order.orderId || order.order_id || orderIdOrIdentifier;
 
@@ -1526,14 +1524,14 @@ window.changeOrderStatus = async function(orderIdOrIdentifier, newStatus) {
 
   // Guardar cambios locales y refrescar vistas y métricas del dashboard
   saveState();
-  if (typeof renderProducts === 'function') renderProducts();
+  if (window.products && typeof renderProducts === 'function') renderProducts();
   if (typeof updateDashboardMetrics === 'function') updateDashboardMetrics();
   if (typeof filterAdminView === 'function') filterAdminView();
 };
+
 window.crearOrden = async function(nuevaOrdenData) {
   const client = getSupabaseClient();
   
-  // Mapeamos los datos locales a los nombres exactos de las columnas de Supabase
   const dbPayload = {
     order_id: nuevaOrdenData.orderId,
     client_name: nuevaOrdenData.clientName,
@@ -1554,12 +1552,10 @@ window.crearOrden = async function(nuevaOrdenData) {
       return null;
     }
     if (data && data.length > 0) {
-      // Guardar también el id interno generado por Supabase si lo necesitas
       nuevaOrdenData.id = data[0].id;
     }
   }
 
-  // Guardar localmente
   window.orders = window.orders || [];
   window.orders.unshift(nuevaOrdenData);
   saveState();
@@ -1567,8 +1563,8 @@ window.crearOrden = async function(nuevaOrdenData) {
   if (typeof filterAdminView === 'function') filterAdminView();
   return nuevaOrdenData;
 };
+
 window.handleSequentialFilesSelect = function(event) {
-  // Lógica para manejar la selección múltiple de imágenes de productos
   const files = event.target.files;
   if (files && files.length > 0) {
     console.log(`${files.length} imágenes seleccionadas.`);
