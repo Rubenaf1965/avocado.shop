@@ -1570,3 +1570,22 @@ window.handleSequentialFilesSelect = function(event) {
     console.log(`${files.length} imágenes seleccionadas.`);
   }
 };
+window.searchOrderTracking = function() {
+  const input = document.getElementById('trackingInput') || document.querySelector('input[placeholder*="AVO-"]');
+  if (!input) return;
+  const code = input.value.trim();
+  
+  if (!code) {
+    alert("Por favor ingresa un código de orden.");
+    return;
+  }
+
+  // Buscar la orden localmente o en el arreglo global
+  const foundOrder = (window.orders || []).find(o => (o.orderId || o.order_id) === code);
+  
+  if (foundOrder) {
+    alert(`¡Orden Encontrada!\n\n• Código: ${foundOrder.orderId || foundOrder.order_id}\n• Cliente: ${foundOrder.clientName || foundOrder.client_name}\n• Estado: ${foundOrder.status}\n• Total: $${foundOrder.total}`);
+  } else {
+    alert("No se encontró ninguna orden registrada con el código: " + code);
+  }
+};
