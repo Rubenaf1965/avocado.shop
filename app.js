@@ -271,13 +271,36 @@ window.handleCreateProduct = async (e) => {
     document.getElementById('sequentialPreviewContainer').innerHTML = '';
   } else {
     const fileInput = document.getElementById('pImage');
+    const file = fileInput && fileInput.files ? fileInput.files[0] : null;
     let imageUrl = "https://images.unsplash.com/photo-1604654894610-df63bc536371?w=400";
 
-    if (fileInput && fileInput.files && fileInput.files[0]) {
+    // Si hay un archivo seleccionado y cliente de Supabase disponible, súbelo a Storage
+    if (file && client) {
       try {
-        imageUrl = await readFileAsBase64(fileInput.files[0]);
+        const fileExt = file.name.split('.').pop();
+        const fileName = `${Date.now()}.${fileExt}`;
+        const filePath = `${fileName}`;
+
+        // Subir al bucket 'products-images' en Supabase Storage
+        const { error: uploadError } = await client.storage
+          .from('products-images')
+          .upload(filePath, file);
+
+        if (uploadError) {
+          console.error('Error al subir la imagen:', uploadError.message);
+          alert('Hubo un error al subir la imagen al Storage.');
+          return;
+        }
+
+        // Obtener la URL pública de la imagen
+        const { data: urlData } = client.storage
+          .from('products-images')
+          .getPublicUrl(filePath);
+
+        imageUrl = urlData.publicUrl;
       } catch (err) {
-        return alert("Error procesando imagen.");
+        console.error("Error procesando la imagen:", err);
+        return alert("Error procesando la imagen para el Storage.");
       }
     }
 
@@ -288,7 +311,7 @@ window.handleCreateProduct = async (e) => {
       branch: targetBranch,
       price: price,
       stock: stock,
-      image: imageUrl
+      image: imageUrl // Se guarda la URL pública del Storage en lugar de Base64
     };
 
     if (client) {
@@ -299,7 +322,7 @@ window.handleCreateProduct = async (e) => {
       newProduct.id = Date.now().toString();
       window.products.push(newProduct);
     }
-    alert("✅ Producto individual guardado con éxito.");
+    alert("✅ Producto guardado exitosamente con Supabase Storage.");
   }
 
   saveState();
