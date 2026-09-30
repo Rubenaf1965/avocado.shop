@@ -1428,6 +1428,12 @@ window.viewOrderModal = function(orderId) {
 };
 
 window.deleteOrder = async function(orderId) {
+  // Validar si el ID es un número '0' o inválido
+  if (!orderId || orderId === 0 || orderId === "0") {
+    alert("Error: El ID de la orden no es válido.");
+    return;
+  }
+
   if (!confirm("¿Estás seguro de que deseas eliminar esta orden?")) return;
 
   const client = getSupabaseClient();
@@ -1446,7 +1452,6 @@ window.deleteOrder = async function(orderId) {
   if (typeof updateDashboardMetrics === 'function') updateDashboardMetrics();
   alert("🗑️ Orden eliminada exitosamente.");
 };
-
 window.changeOrderStatus = async function(orderId, newStatus) {
   const client = getSupabaseClient();
   
