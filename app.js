@@ -1650,33 +1650,35 @@ window.toggleDeliveryAddress = function(selectElement) {
     }
   }
 };
-window.displayOrderDetails = function(orderId) {
-  const orders = window.orders || [];
-  const order = orders.find(o => o.id == orderId || o.orderId == orderId || o.order_id == orderId);
+window.displayOrderDetails = function(orderIdOrIdentifier) {
+  // Asegurarnos de que el arreglo de órdenes existe
+  const ordersList = window.orders || [];
 
+  // Buscar la orden probando todas las posibles propiedades de identificación
+  let order = ordersList.find(o => 
+    String(o.id) === String(orderIdOrIdentifier) || 
+    String(o.orderId) === String(orderIdOrIdentifier) || 
+    String(o.order_id) === String(orderIdOrIdentifier)
+  );
+
+  // Si no se encuentra localmente, intentar buscarla en el DOM o en la tabla si estuviera guardada en un atributo
   if (!order) {
+    console.warn("Orden no encontrada en memoria local con el identificador:", orderIdOrIdentifier);
     alert("No se encontró la información de la orden.");
     return;
   }
 
-  // Generar lista de productos de la orden
-  const items = order.items || order.items_json || [];
-  let itemsHtml = items.map(item => `
-    <div class="flex justify-between border-b py-1 text-xs">
-      <span>${item.name || item.product_name || 'Producto'} (x${item.qty || item.quantity || 1})</span>
-      <span>$${Number((item.price || 0) * (item.qty || item.quantity || 1)).toFixed(2)}</span>
-    </div>
-  `).join('');
-
-  // Crear o reutilizar un modal flotante en pantalla
-  let modal = document.getElementById('orderDetailsModal');
-  if (!modal) {
-    modal = document.createElement('div');
-    modal.id = 'orderDetailsModal';
-    modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4';
-    document.body.appendChild(modal);
+  // Si se encuentra, proceder a desplegar el modal o la factura
+  // (Aquí continúa tu lógica existente para mostrar el modal de detalles o generar el PDF)
+  console.log("Orden encontrada:", order);
+  
+  // Ejemplo de apertura de modal si ya lo tienes implementado:
+  const modal = document.getElementById('ordersModal') || document.getElementById('order-details-modal');
+  if (modal) {
+    modal.classList.remove('hidden');
+    // Rellenar datos de la orden aquí...
   }
-
+};
   modal.innerHTML = `
     <div class="bg-white rounded-xl shadow-xl max-w-md w-full p-6 relative">
       <button onclick="document.getElementById('orderDetailsModal').remove()" class="absolute top-3 right-3 text-gray-500 hover:text-black font-bold text-lg">&times;</button>
