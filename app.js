@@ -571,6 +571,11 @@ window.processCheckout = async function() {
     if (typeof saveState === 'function') saveState();
     if (typeof renderCart === 'function') renderCart();
 
+// 👉 AGREGAR AQUÍ: Cerrar el modal del carrito en pantalla
+    const cartModal = document.getElementById('cartModal') || document.querySelector('.cart-modal') || document.getElementById('carritoModal');
+    if (cartModal) {
+      cartModal.classList.add('hidden');
+    }
     alert("¡Pedido generado y enviado con éxito!");
 
   } catch (error) {
