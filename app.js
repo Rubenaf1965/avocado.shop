@@ -1278,46 +1278,64 @@ window.deleteSeller = function(idOrIndex) {
 };
 window.openInventoryReport = async function() {
   const client = getSupabaseClient();
-  let productosParaReporte = [];
+  let productosParaReporte = window.products || [];
 
-  if (client) {
+  // Si el arreglo global está vacío, intentamos buscar en Supabase
+  if (productosParaReporte.length === 0 && client) {
     const { data, error } = await client.from('products').select('*');
     if (!error && data) {
       productosParaReporte = data;
       window.products = data;
-    } else {
-      console.error("Error al obtener productos para el reporte:", error);
     }
-  } else {
-    productosParaReporte = window.products || [];
   }
 
-  const tbody = document.getElementById('inventoryReportTableBody');
-  if (!tbody) return;
+  // Buscamos el cuerpo de la tabla del reporte (probando los nombres más comunes)
+  let tbody = document.getElementById('inventoryReportTableBody') || 
+              document.getElementById('reportTableBody') || 
+              document.querySelector('#inventoryReportModal tbody');
+
+  if (!tbody) {
+    console.error("No se encontró el cuerpo de la tabla del reporte en el DOM.");
+    return;
+  }
 
   tbody.innerHTML = '';
   let totalUnidades = 0;
 
   productosParaReporte.forEach(prod => {
-    totalUnidades += parseInt(prod.stock || 0);
+    const stockVal = parseInt(prod.stock || 0);
+    totalUnidades += stockVal;
+    
     tbody.innerHTML += `
       <tr>
-        <td>${prod.sku || 'N/A'}</td>
-        <td>${prod.name}</td>
-        <td>${prod.category}</td>
-        <td>${prod.branch}</td>
-        <td>$${prod.price}</td>
-        <td>$${(prod.price * (window.currentBcvRate || 1)).toFixed(2)}</td>
-        <td>${prod.stock}</td>
+        <td style="padding: 8px; border-bottom: 1px solid #eee;">${prod.sku || 'N/A'}</td>
+        <td style="padding: 8px; border-bottom: 1px solid #eee;">${prod.name}</td>
+        <td style="padding: 8px; border-bottom: 1px solid #eee;">${prod.category}</td>
+        <td style="padding: 8px; border-bottom: 1px solid #eee;">${prod.branch}</td>
+        <td style="padding: 8px; border-bottom: 1px solid #eee;">$${parseFloat(prod.price).toFixed(2)}</td>
+        <td style="padding: 8px; border-bottom: 1px solid #eee;">Bs. ${(prod.price * (window.currentBcvRate || 1)).toFixed(2)}</td>
+        <td style="padding: 8px; border-bottom: 1px solid #eee;">${stockVal}</td>
       </tr>
     `;
   });
 
-  const countElem = document.getElementById('totalProductsCount');
-  const unitsElem = document.getElementById('totalUnitsCount');
+  // Actualizar contadores totales en el modal
+  const countElem = document.getElementById('totalProductsCount') || document.getElementById('totalProducts');
+  const unitsElem = document.getElementById('totalUnitsCount') || document.getElementById('totalUnits');
+  
   if (countElem) countElem.innerText = productosParaReporte.length;
   if (unitsElem) unitsElem.innerText = totalUnidades;
-  
+
+  // Actualizar fecha y tasa BCV en la cabecera del reporte si existen
+  const dateElem = document.getElementById('reportDate');
+  const bcvElem = document.getElementById('reportBcvRate');
+  if (dateElem) dateElem.innerText = new Date().toLocaleDateString();
+  if (bcvElem && window.currentBcvRate) bcvElem.innerText = window.currentBcvRate;
+
+  // Mostrar el modal (compatible con estilos estilo display block o clases CSS)
   const modal = document.getElementById('inventoryReportModal');
-  if (modal) modal.style.display = 'block';
+  if (modal) {
+    modal.style.display = 'block';
+    modal.classList.remove('hidden');
+  }
 };
