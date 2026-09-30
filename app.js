@@ -1293,7 +1293,7 @@ window.displayInventoryScreen = async function() {
     productos = window.products || [];
   }
 
-  // 2. Buscar el modal del reporte en el DOM
+  // 2. Buscar el modal del reporte de forma segura
   let modal = document.getElementById('inventoryReportModal') || 
               document.getElementById('inventoryScreenModal') || 
               document.getElementById('modalReporteInventario');
@@ -1323,7 +1323,7 @@ window.displayInventoryScreen = async function() {
   // 4. Limpiar y rellenar la tabla con los datos reales
   tbody.innerHTML = '';
   let totalUnidades = 0;
-  const tasaBcv = window.currentBcvRate || 857.89; // Tomamos la tasa actual de la interfaz o la guardada globalmente
+  const tasaBcv = window.currentBcvRate || 857.89;
 
   productos.forEach(prod => {
     const stockVal = parseInt(prod.stock || 0);
@@ -1344,39 +1344,44 @@ window.displayInventoryScreen = async function() {
     `;
   });
 
-  // 5. Rellenar fecha actual y tasa BCV en el encabezado del reporte de forma dinámica
+  // 5. Actualizar la fecha y la tasa BCV EXCLUSIVAMENTE dentro del encabezado del modal
   const fechaActual = new Date().toLocaleDateString('es-VE', { year: 'numeric', month: '2-digit', day: '2-digit' });
   
-  // Buscamos los textos de Fecha y Tasa dentro del modal para actualizarlos
-  const modalTextos = modal.querySelectorAll('div, span');
+  // Buscamos elementos específicos dentro del modal para evitar modificar la página principal
+  const modalTextos = modal.querySelectorAll('span, p, div');
   modalTextos.forEach(el => {
-    if (el.innerText && el.innerText.includes('Fecha:')) {
-      el.innerText = `Fecha: ${fechaActual}`;
-    }
-    if (el.innerText && el.innerText.includes('Tasa BCV:')) {
-      el.innerText = `Tasa BCV: Bs. ${tasaBcv}`;
+    // Verificamos que sea un nodo de texto directo o corto para evitar sobreescribir contenedores grandes
+    if (el.children.length === 0 && el.innerText) {
+      if (el.innerText.includes('Fecha:')) {
+        el.innerText = `Fecha: ${fechaActual}`;
+      }
+      if (el.innerText.includes('Tasa BCV:')) {
+        el.innerText = `Tasa BCV: Bs. ${tasaBcv}`;
+      }
     }
   });
 
-  // 6. Actualizar contadores totales (Productos y Unidades)
-  const totalProductosElem = document.getElementById('totalProductsCount') || modal.querySelector('#totalProductsCount');
-  const totalUnidadesElem = document.getElementById('totalUnitsCount') || modal.querySelector('#totalUnitsCount');
+  // 6. Actualizar contadores totales de productos y unidades
+  const totalProductosElem = modal.querySelector('#totalProductsCount');
+  const totalUnidadesElem = modal.querySelector('#totalUnitsCount');
   
   if (totalProductosElem) totalProductosElem.innerText = productos.length;
   if (totalUnidadesElem) totalUnidadesElem.innerText = totalUnidades;
 
-  // Si los contadores usan un formato de texto general dentro del modal:
+  // Si el resumen usa texto plano dentro del modal:
   modalTextos.forEach(el => {
-    if (el.innerText && el.innerText.includes('Total Productos:')) {
+    if (el.children.length === 0 && el.innerText && el.innerText.includes('Total Productos:')) {
       el.innerHTML = `Total Productos: <b>${productos.length}</b> &nbsp;&nbsp;&nbsp;&nbsp; Unidades Totales: <b>${totalUnidades}</b>`;
     }
   });
 
-  // 7. Activar los botones de cierre ("Cerrar", la "X" superior y fuera del modal)
+  // 7. Activar los botones de cierre ("Cerrar" y la "X") de forma segura
   const botonesCerrar = modal.querySelectorAll('button, span');
   botonesCerrar.forEach(btn => {
     if (btn.innerText && (btn.innerText.trim() === 'Cerrar' || btn.innerText.trim() === '✕')) {
-      btn.onclick = () => {
+      // Evitamos duplicar eventos limpiando la referencia previa
+      btn.onclick = (e) => {
+        e.preventDefault();
         modal.style.display = 'none';
         modal.classList.add('hidden');
       };
