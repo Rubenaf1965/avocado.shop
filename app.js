@@ -1591,22 +1591,14 @@ window.searchOrderTracking = function() {
 };
 window.toggleDeliveryAddress = function(selectElement) {
   const selectedValue = selectElement.value;
-  
-  // Buscar o crear el contenedor para el input de la dirección de envío
   let addressContainer = document.getElementById('deliveryAddressContainer');
   
-  if (!addressContainer) {
-    // Si no existe en el HTML, lo creamos justo debajo del selector de entrega
-    addressContainer = document.createElement('div');
-    addressContainer.id = 'deliveryAddressContainer';
-    addressContainer.className = 'mt-3';
-    selectElement.parentNode.insertAdjacentElement('afterend', addressContainer);
-  }
+  if (!addressContainer) return;
 
-  if (selectedValue.toLowerCase().includes('delivery') || selectedValue === 'Envío por Delivery') {
+  if (selectedValue === 'delivery') {
     addressContainer.innerHTML = `
-      <label class="block text-xs font-semibold text-gray-600 mb-1">Dirección Exacta de Delivery:</label>
-      <input type="text" id="deliveryAddressInput" placeholder="Ej: Urbanización, Calle, Casa/Edificio, Apt..." class="w-full p-2 border rounded-md text-sm">
+      <label class="block text-[11px] font-bold text-gray-700 mb-1">Dirección Exacta de Delivery:</label>
+      <input type="text" id="deliveryAddressInput" placeholder="Ej: Urbanización, Calle, Casa/Edificio..." class="w-full border rounded-lg p-2 text-xs outline-none bg-white font-medium">
     `;
     addressContainer.style.display = 'block';
   } else {

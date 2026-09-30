@@ -622,11 +622,11 @@
           </div>
 
           <div>
-            <label class="block text-[11px] font-bold text-gray-700 mb-1">Opciones de Entrega:</label>
-            <select id="deliveryOption" onchange="toggleDeliveryAddress()" class="w-full border rounded-lg p-2 text-xs outline-none bg-white font-medium">
-              <option value="pickup">Retiro en Sucursal</option>
-              <option value="delivery">Envío por Delivery</option>
-            </select>
+           <select id="deliveryOption" onchange="toggleDeliveryAddress(this)" class="w-full border rounded-lg p-2 text-xs outline-none bg-white font-medium">
+  <option value="pickup">Retiro en Sucursal</option>
+  <option value="delivery">Envío por Delivery</option>
+</select>
+<div id="deliveryAddressContainer" class="mt-2"></div>
           </div>
 
           <div id="pickupBranchContainer">
