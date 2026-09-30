@@ -1456,43 +1456,80 @@ window.deleteOrder = async function(orderIdOrIdentifier) {
 window.changeOrderStatus = async function(orderIdOrIdentifier, newStatus) {
   const client = getSupabaseClient();
   
-  // Encontrar la orden localmente
-  const order = (window.orders || []).find(o => o.id == orderIdOrIdentifier || o.orderId == orderIdOrIdentifier);
-  if (order) {
-    order.status = newStatus;
+  // Buscar la orden tanto por ID interno, orderId (AVO-XXXXXX) o coincidencia flexible
+  let order = (window.orders || []).find(o => 
+    o.id == orderIdOrIdentifier || 
+    o.orderId == orderIdOrIdentifier || 
+    o.order_id == orderIdOrIdentifier
+  );
 
-    // Si la orden cambia a procesada/facturada, descontar inventario automáticamente
-    if (newStatus === 'Procesado' || newStatus === 'Completado' || newStatus === 'Entregado') {
-      if (order.items && Array.isArray(order.items)) {
-        for (let item of order.items) {
-          if (client) {
-            // Consultar stock actual en Supabase usando el id del producto
-            const { data: prodData } = await client.from('products').select('stock').eq('id', item.id).single();
-            if (prodData) {
-              const nuevoStock = Math.max(0, prodData.stock - (item.qty || item.quantity || 1));
-              await client.from('products').update({ stock: nuevoStock }).eq('id', item.id);
-            }
+  if (!order) {
+    alert("No se encontró la información local de la orden.");
+    return;
+  }
+
+  // Actualizar estado localmente
+  order.status = newStatus;
+
+  // Si la orden pasa a Procesado, descontar stock de los productos
+  if (newStatus === 'Procesado' || newStatus === 'Completado' || newStatus === 'Entregado') {
+    const itemsList = order.items || order.items_json;
+    if (itemsList && Array.isArray(itemsList)) {
+      for (let item of itemsList) {
+        const prodId = item.id || item.product_id;
+        const qtyToSubtract = Number(item.qty || item.quantity || 1);
+
+        if (client && prodId) {
+          // Consultar el stock actual en Supabase
+          const { data: prodData, error: prodError } = await client
+            .from('products')
+            .select('stock, id')
+            .eq('id', prodId)
+            .single();
+
+          if (prodData) {
+            const nuevoStock = Math.max(0, Number(prodData.stock) - qtyToSubtract);
+            // Actualizar stock en Supabase
+            await client
+              .from('products')
+              .update({ stock: nuevoStock })
+              .eq('id', prodId);
+          }
+        }
+
+        // Actualizar stock en el arreglo local de productos si existe
+        if (window.products && Array.isArray(window.products)) {
+          const localProd = window.products.find(p => p.id == prodId);
+          if (localProd) {
+            localProd.stock = Math.max(0, Number(localProd.stock) - qtyToSubtract);
           }
         }
       }
     }
-
-    if (client) {
-      // Determinamos si el identificador es el ID interno de Supabase o el código AVO
-      const isNumericOrUuid = !String(orderIdOrIdentifier).startsWith('AVO-');
-      const queryField = isNumericOrUuid ? 'id' : 'orderId';
-      
-      const { error } = await client.from('orders').update({ status: newStatus }).eq(queryField, orderIdOrIdentifier);
-      if (error) {
-        console.error("Error al actualizar estado en Supabase:", error.message);
-      }
-    }
-    saveState();
   }
 
+  // Sincronizar el cambio de estado en la tabla 'orders' de Supabase
+  if (client) {
+    const isUuid = String(orderIdOrIdentifier).includes('-') && !String(orderIdOrIdentifier).startsWith('AVO-');
+    const queryField = isUuid ? 'id' : 'order_id';
+    const targetValue = order.orderId || order.order_id || orderIdOrIdentifier;
+
+    const { error: updateError } = await client
+      .from('orders')
+      .update({ status: newStatus })
+      .eq(queryField, targetValue);
+
+    if (updateError) {
+      console.error("Error al actualizar estado en Supabase:", updateError.message);
+    }
+  }
+
+  // Guardar cambios locales y refrescar vistas y métricas del dashboard
+  saveState();
+  if (typeof renderProducts === 'function') renderProducts();
+  if (typeof updateDashboardMetrics === 'function') updateDashboardMetrics();
   if (typeof filterAdminView === 'function') filterAdminView();
 };
-
 window.crearOrden = async function(nuevaOrdenData) {
   const client = getSupabaseClient();
   
