@@ -274,14 +274,12 @@ window.handleCreateProduct = async (e) => {
     const file = fileInput && fileInput.files ? fileInput.files[0] : null;
     let imageUrl = "https://images.unsplash.com/photo-1604654894610-df63bc536371?w=400";
 
-    // Si hay un archivo seleccionado y cliente de Supabase disponible, súbelo a Storage
     if (file && client) {
       try {
         const fileExt = file.name.split('.').pop();
         const fileName = `${Date.now()}.${fileExt}`;
         const filePath = `${fileName}`;
 
-        // Subir al bucket 'products-images' en Supabase Storage
         const { error: uploadError } = await client.storage
           .from('products-images')
           .upload(filePath, file);
@@ -292,7 +290,6 @@ window.handleCreateProduct = async (e) => {
           return;
         }
 
-        // Obtener la URL pública de la imagen
         const { data: urlData } = client.storage
           .from('products-images')
           .getPublicUrl(filePath);
@@ -311,14 +308,13 @@ window.handleCreateProduct = async (e) => {
       branch: targetBranch,
       price: price,
       stock: stock,
-      image: imageUrl // Se guarda la URL pública del Storage en lugar de Base64
+      image: imageUrl
     };
 
     if (client) {
       const { data, error } = await client.from('products').insert([newProduct]).select();
       if (error) return alert("Error en Supabase: " + error.message);
       if (data && data.length > 0) {
-        // Asegurarnos de agregar el objeto que devuelve Supabase (con su ID real) al arreglo global
         window.products.push(data[0]);
       }
     } else {
@@ -326,12 +322,11 @@ window.handleCreateProduct = async (e) => {
       window.products.push(newProduct);
     }
     
-    alert("✅ Producto guardado exitosamente con Supabase Storage.");
+    alert("✅ Producto guardado exitosamente.");
   }
 
-  // 4. Forzar la actualización visual del inventario y la tienda
   if (typeof window.fetchProductsFromSupabase === 'function') {
-    await window.fetchProductsFromSupabase(); // Vuelve a consultar la base de datos para sincronizar todo
+    await window.fetchProductsFromSupabase();
   } else {
     renderStoreProducts();
     if (typeof filterAdminView === 'function') filterAdminView();
@@ -506,7 +501,6 @@ window.cancelPurchase = () => {
 
 window.processCheckout = async function() {
   try {
-    // Lectura segura de los campos del carrito para evitar errores si alguno está oculto
     const clientNameInput = document.getElementById('clientName') || document.querySelector('input[placeholder*="Nombre"]');
     const deliveryOptionSelect = document.getElementById('deliveryOption');
     const branchSelect = document.getElementById('branchSelect');
@@ -529,7 +523,6 @@ window.processCheckout = async function() {
       return;
     }
 
-    // Generar código único de orden
     const orderId = 'AVO-' + Math.floor(100000 + Math.random() * 900000);
     const cartItems = window.cart || [];
 
@@ -551,27 +544,22 @@ window.processCheckout = async function() {
       items: cartItems
     };
 
-    // Guardar orden (usando tu función crearOrden existente)
     if (typeof crearOrden === 'function') {
       await crearOrden(nuevaOrdenData);
     }
 
-    // Construir mensaje para WhatsApp
     const itemsText = cartItems.map(i => `• ${i.name || i.product_name} (x${i.qty || 1}) - $${Number(i.price * (i.qty || 1)).toFixed(2)}`).join('\n');
     const message = `*¡Nuevo Pedido!* (${orderId})\n\n*Cliente:* ${clientName}\n*Entrega:* ${nuevaOrdenData.deliveryType}\n*Ref. Pago:* ${paymentReference}\n\n*Productos:*\n${itemsText}\n\n*Total:* $${total.toFixed(2)}`;
 
-    // Abrir WhatsApp
-    const whatsappNumber = "584143943252"; // Ajusta tu número si es necesario
+    const whatsappNumber = "584143943252";
     const whatsappUrl = `https://api.whatsapp.com/send?phone=${whatsappNumber}&text=${encodeURIComponent(message)}`;
     
     window.open(whatsappUrl, '_blank');
 
-   // Limpiar carrito y almacenamiento local
-window.cart = [];
-localStorage.removeItem('avocado_cart'); // 👈 Vital para borrarlo del almacenamiento
-if (typeof updateCartUI === 'function') updateCartUI(); // 👈 Usar la función correcta
+    window.cart = [];
+    localStorage.removeItem('avocado_cart');
+    if (typeof updateCartUI === 'function') updateCartUI();
 
-// 👉 AGREGAR AQUÍ: Cerrar el modal del carrito en pantalla
     const cartModal = document.getElementById('cartModal') || document.querySelector('.cart-modal') || document.getElementById('carritoModal');
     if (cartModal) {
       cartModal.classList.add('hidden');
@@ -1100,15 +1088,15 @@ function renderOrdersTable(filterBranch = activeAdminBranch) {
     const isGlobalAccess = activeAdminBranch === "ALL";
     const currentStatus = o.status || 'En Verificación';
     const badgeClass = getStatusBadgeClass(currentStatus);
-    const identifier = o.id || o.orderId;
+    const identifier = o.id || o.orderId || o.order_id;
 
     return `
       <tr>
-        <td class="p-2.5 font-bold">${o.orderId}</td>
-        <td class="p-2.5">${o.clientName}</td>
-        <td class="p-2.5 text-slate-500">${o.deliveryType || 'Retiro'} (${o.branch})</td>
-        <td class="p-2.5 font-bold">$${o.total.toFixed(2)}</td>
-        <td class="p-2.5">#${o.paymentReference}</td>
+        <td class="p-2.5 font-bold">${o.orderId || o.order_id}</td>
+        <td class="p-2.5">${o.clientName || o.client_name}</td>
+        <td class="p-2.5 text-slate-500">${o.deliveryType || o.delivery_type || 'Retiro'} (${o.branch})</td>
+        <td class="p-2.5 font-bold">$${Number(o.total || 0).toFixed(2)}</td>
+        <td class="p-2.5">#${o.paymentReference || o.payment_reference || 'N/A'}</td>
         <td class="p-2.5">
           <select onchange="changeOrderStatus('${identifier}', this.value)" class="text-[10px] font-bold rounded-lg px-2 py-1 outline-none cursor-pointer ${badgeClass}">
             <option value="En Verificación" ${currentStatus === 'En Verificación' ? 'selected' : ''}>En Verificación</option>
@@ -1118,7 +1106,7 @@ function renderOrdersTable(filterBranch = activeAdminBranch) {
           </select>
         </td>
         <td class="p-2.5 text-center flex justify-center gap-1.5">
-          <button onclick="viewOrderModal('${o.orderId}')" class="bg-emerald-600 text-white px-2.5 py-1 rounded-md text-[10px] font-bold hover:bg-emerald-700 transition flex items-center gap-1">
+          <button onclick="displayOrderDetails('${identifier}')" class="bg-emerald-600 text-white px-2.5 py-1 rounded-md text-[10px] font-bold hover:bg-emerald-700 transition flex items-center gap-1">
             👁️ Ver / Facturar
           </button>
           ${isGlobalAccess ? `<button onclick="deleteOrder('${identifier}')" title="Eliminar Orden" class="bg-red-50 text-red-600 hover:bg-red-100 px-2 py-1 rounded-md text-[10px] font-bold">🗑️</button>` : ''}
@@ -1127,6 +1115,7 @@ function renderOrdersTable(filterBranch = activeAdminBranch) {
     `;
   }).join('');
 }
+
 function getStatusBadgeClass(status) {
   switch (status) {
     case 'Procesado':
@@ -1168,7 +1157,6 @@ function updateBranchStats() {
   if (countDeliveryElem) countDeliveryElem.textContent = `${deliveryOrders.length} pedido(s) registrado(s)`;
 }
 
-// Configuración de eventos de la interfaz
 function setupFilters() {
   const searchInput = document.getElementById('searchInput');
   if (searchInput) {
@@ -1196,7 +1184,6 @@ function setupFilters() {
   if (btnCloseCart) btnCloseCart.addEventListener('click', () => document.getElementById('cartModal').classList.add('hidden'));
 }
 
-// Inicialización general al cargar el DOM
 document.addEventListener('DOMContentLoaded', () => {
   fetchLiveBcvRate();
   renderStoreProducts();
@@ -1220,12 +1207,6 @@ document.addEventListener('DOMContentLoaded', () => {
 // ==========================================
 // MÓDULO DE REPORTES Y GESTIÓN DE VENDEDORES
 // ==========================================
-window.displayInventoryScreen = function() {
-  const modal = document.getElementById('screenReportModal');
-  if (modal) modal.classList.remove('hidden');
-  if (typeof renderScreenReport === 'function') renderScreenReport();
-};
-
 window.closeScreenReport = function() {
   const modal = document.getElementById('screenReportModal');
   if (modal) modal.classList.add('hidden');
@@ -1298,6 +1279,7 @@ window.deleteSeller = function(idOrIndex) {
     }
   }
 };
+
 window.displayInventoryScreen = async function() {
   const client = getSupabaseClient();
   let productos = [];
@@ -1333,7 +1315,7 @@ window.displayInventoryScreen = async function() {
 
   tbody.innerHTML = '';
   let totalUnidades = 0;
-  const tasaBcv = window.currentBcvRate || 857.89;
+  const tasaBcv = window.currentBcvRate || getActiveBcvRate();
 
   productos.forEach(prod => {
     const stockVal = parseInt(prod.stock || 0);
@@ -1354,7 +1336,6 @@ window.displayInventoryScreen = async function() {
     `;
   });
 
-  // Asignar fecha y tasa de forma directa buscando los textos en el modal
   const fechaActual = new Date().toLocaleDateString('es-VE', { year: 'numeric', month: '2-digit', day: '2-digit' });
   
   modal.querySelectorAll('span, p, div').forEach(el => {
@@ -1371,7 +1352,6 @@ window.displayInventoryScreen = async function() {
     }
   });
 
-  // Asignar eventos de cierre al botón "Cerrar" y a la "X" superior
   const botonesCerrar = modal.querySelectorAll('button, svg, path');
   botonesCerrar.forEach(btn => {
     if (btn.innerText && btn.innerText.trim() === 'Cerrar') {
@@ -1396,59 +1376,10 @@ window.displayInventoryScreen = async function() {
   modal.style.display = 'block';
   modal.classList.remove('hidden');
 };
-window.descontarStockSupabase = async function(productosVendidos) {
-  const client = getSupabaseClient();
-  if (!client) return;
 
-  for (let item of productosVendidos) {
-    // 1. Consultar el stock actual del producto en Supabase[cite: 17]
-    const { data: productoActual, error: fetchError } = await client
-      .from('products')
-      .select('stock, id')
-      .eq('id', item.id)
-      .single();
-
-    if (!fetchError && productoActual) {
-      const nuevoStock = Math.max(0, productoActual.stock - item.qty);
-      // 2. Actualizar el inventario descontando las unidades vendidas[cite: 17]
-      await client
-        .from('products')
-        .update({ stock: nuevoStock })
-        .eq('id', item.id);
-    }
-  }
-};
-
-// --- GESTIÓN DE ÓRDENES Y FACTURACIÓN ---
-
-window.viewOrderModal = function(orderId) {
-  // Buscar la orden en el arreglo global de órdenes
-  const order = (window.orders || []).find(o => o.id === orderId || o.code === orderId);
-  if (!order) {
-    alert("No se encontró la información de la orden.");
-    return;
-  }
-
-  // Lógica para desplegar el modal de detalles de la orden
-  const modal = document.getElementById('orderDetailModal') || document.getElementById('viewOrderModal');
-  if (modal) {
-    modal.style.display = 'block';
-    modal.classList.remove('hidden');
-    // Rellenar datos si existen elementos correspondientes
-    const content = document.getElementById('orderDetailsContent');
-    if (content) {
-      content.innerHTML = `
-        <p><b>Orden:</b> ${order.code || order.id}</p>
-        <p><b>Cliente:</b> ${order.clientName || 'N/A'}</p>
-        <p><b>Total:</b> $${order.total || 0}</p>
-        <p><b>Estado:</b> ${order.status || 'Procesado'}</p>
-      `;
-    }
-  } else {
-    alert(`Detalles de la Orden ${order.code || orderId} - Cliente: ${order.clientName || 'N/A'} - Total: $${order.total || 0}`);
-  }
-};
-
+// ==========================================
+// GESTIÓN DE ÓRDENES Y FACTURACIÓN
+// ==========================================
 window.deleteOrder = async function(orderIdOrIdentifier) {
   if (!orderIdOrIdentifier) {
     alert("Error: Identificador de orden inválido.");
@@ -1459,9 +1390,8 @@ window.deleteOrder = async function(orderIdOrIdentifier) {
 
   const client = getSupabaseClient();
   if (client) {
-    // Determinar si es un ID de Supabase (UUID o número largo) o un código AVO-XXXXXX
     const isNumericOrUuid = !String(orderIdOrIdentifier).startsWith('AVO-');
-    const queryField = isNumericOrUuid ? 'id' : 'orderId';
+    const queryField = isNumericOrUuid ? 'id' : 'order_id';
 
     const { error } = await client.from('orders').delete().eq(queryField, orderIdOrIdentifier);
     if (error) {
@@ -1470,8 +1400,7 @@ window.deleteOrder = async function(orderIdOrIdentifier) {
     }
   }
 
-  // Remover del arreglo local
-  window.orders = (window.orders || []).filter(o => o.id !== orderIdOrIdentifier && o.orderId !== orderIdOrIdentifier);
+  window.orders = (window.orders || []).filter(o => o.id !== orderIdOrIdentifier && o.orderId !== orderIdOrIdentifier && o.order_id !== orderIdOrIdentifier);
   saveState();
   
   if (typeof filterAdminView === 'function') filterAdminView();
@@ -1481,11 +1410,10 @@ window.deleteOrder = async function(orderIdOrIdentifier) {
 window.changeOrderStatus = async function(orderIdOrIdentifier, newStatus) {
   const client = getSupabaseClient();
   
-  // Buscar la orden localmente
   let order = (window.orders || []).find(o => 
-    o.id == orderIdOrIdentifier || 
-    o.orderId == orderIdOrIdentifier || 
-    o.order_id == orderIdOrIdentifier
+    String(o.id) === String(orderIdOrIdentifier) || 
+    String(o.orderId) === String(orderIdOrIdentifier) || 
+    String(o.order_id) === String(orderIdOrIdentifier)
   );
 
   if (!order) {
@@ -1493,10 +1421,8 @@ window.changeOrderStatus = async function(orderIdOrIdentifier, newStatus) {
     return;
   }
 
-  // Actualizar estado localmente
   order.status = newStatus;
 
-  // Si la orden pasa a un estado avanzado, descontar stock
   if (newStatus === 'Procesado' || newStatus === 'Completado' || newStatus === 'Entregado') {
     const itemsList = order.items || order.items_json;
     if (itemsList && Array.isArray(itemsList)) {
@@ -1530,9 +1456,7 @@ window.changeOrderStatus = async function(orderIdOrIdentifier, newStatus) {
     }
   }
 
-  // Sincronizar el cambio de estado en la tabla 'orders' de Supabase de forma segura
   if (client) {
-    // Si el identificador empieza con 'AVO-', forzamos a buscar por 'order_id'
     const isAvsCode = String(orderIdOrIdentifier).startsWith('AVO-');
     const queryField = isAvsCode ? 'order_id' : 'id';
     const targetValue = order.orderId || order.order_id || orderIdOrIdentifier;
@@ -1547,10 +1471,9 @@ window.changeOrderStatus = async function(orderIdOrIdentifier, newStatus) {
     }
   }
 
-  // Guardar cambios locales y refrescar vistas sin errores
   saveState();
-  if (typeof renderStoreProducts === 'function') renderStoreProducts(); // 👈 Corrección clave (evita el error de length)
-  if (typeof updateDashboardMetrics === 'function') updateDashboardMetrics();
+  if (typeof renderStoreProducts === 'function') renderStoreProducts();
+  if (typeof updateBranchStats === 'function') updateBranchStats();
   if (typeof filterAdminView === 'function') filterAdminView();
 };
 
@@ -1589,12 +1512,6 @@ window.crearOrden = async function(nuevaOrdenData) {
   return nuevaOrdenData;
 };
 
-window.handleSequentialFilesSelect = function(event) {
-  const files = event.target.files;
-  if (files && files.length > 0) {
-    console.log(`${files.length} imágenes seleccionadas.`);
-  }
-};
 window.searchOrderTracking = function() {
   const input = document.getElementById('trackingInput') || document.querySelector('input[placeholder*="AVO-"]');
   if (!input) return;
@@ -1605,7 +1522,6 @@ window.searchOrderTracking = function() {
     return;
   }
 
-  // Buscar la orden localmente o en el arreglo global
   const foundOrder = (window.orders || []).find(o => (o.orderId || o.order_id) === code);
   
   if (foundOrder) {
@@ -1614,79 +1530,75 @@ window.searchOrderTracking = function() {
     alert("No se encontró ninguna orden registrada con el código: " + code);
   }
 };
+
 window.toggleDeliveryAddress = function(selectElement) {
   const selectedValue = selectElement.value;
-  
-  // Contenedores en el formulario del carrito
   const addressContainer = document.getElementById('deliveryAddressContainer');
-  // Ajusta el ID según cómo se llame el contenedor o el div que envuelve al selector/label de sucursal
   const branchContainer = document.getElementById('branchContainer') || document.querySelector('.branch-selection-container'); 
 
   if (!addressContainer) return;
 
-  // Verificamos si es delivery (ya sea por valor 'delivery' o texto 'Envío por Delivery')
   const isDelivery = selectedValue === 'delivery' || selectedValue.toLowerCase().includes('delivery');
 
   if (isDelivery) {
-    // Mostrar campo de dirección
     addressContainer.innerHTML = `
       <label class="block text-[11px] font-bold text-gray-700 mb-1">Dirección Exacta de Delivery:</label>
       <input type="text" id="deliveryAddressInput" placeholder="Ej: Urbanización, Calle, Casa/Edificio..." class="w-full border rounded-lg p-2 text-xs outline-none bg-white font-medium">
     `;
     addressContainer.style.display = 'block';
 
-    // Ocultar la opción de sucursal
     if (branchContainer) {
       branchContainer.style.display = 'none';
     }
   } else {
-    // Ocultar campo de dirección si es retiro en tienda
     addressContainer.style.display = 'none';
     addressContainer.innerHTML = '';
 
-    // Mostrar de nuevo la opción de sucursal
     if (branchContainer) {
       branchContainer.style.display = 'block';
     }
   }
 };
+
+// FUNCIÓN CORREGIDA Y COMPLETAMENTE ENCAPSULADA
 window.displayOrderDetails = function(orderIdOrIdentifier) {
-  // Asegurarnos de que el arreglo de órdenes existe
   const ordersList = window.orders || [];
 
-  // Buscar la orden probando todas las posibles propiedades de identificación
   let order = ordersList.find(o => 
     String(o.id) === String(orderIdOrIdentifier) || 
     String(o.orderId) === String(orderIdOrIdentifier) || 
     String(o.order_id) === String(orderIdOrIdentifier)
   );
 
-  // Si no se encuentra localmente, intentar buscarla en el DOM o en la tabla si estuviera guardada en un atributo
   if (!order) {
     console.warn("Orden no encontrada en memoria local con el identificador:", orderIdOrIdentifier);
     alert("No se encontró la información de la orden.");
     return;
   }
 
-  // Si se encuentra, proceder a desplegar el modal o la factura
-  // (Aquí continúa tu lógica existente para mostrar el modal de detalles o generar el PDF)
-  console.log("Orden encontrada:", order);
+  const itemsList = order.items || order.items_json || [];
+  const itemsHtml = Array.isArray(itemsList) && itemsList.length > 0 ? itemsList.map(item => `
+    <div class="flex justify-between text-xs py-1 border-b border-gray-100">
+      <span>${item.name || item.product_name || 'Producto'} (x${item.qty || item.quantity || 1})</span>
+      <span class="font-bold">$${(Number(item.price || 0) * Number(item.qty || item.quantity || 1)).toFixed(2)}</span>
+    </div>
+  `).join('') : '<p class="text-xs text-gray-500">Sin detalles de productos</p>';
+
+  const existingModal = document.getElementById('orderDetailsModal');
+  if (existingModal) existingModal.remove();
+
+  const modalContainer = document.createElement('div');
+  modalContainer.id = 'orderDetailsModal';
+  modalContainer.className = 'fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4';
   
-  // Ejemplo de apertura de modal si ya lo tienes implementado:
-  const modal = document.getElementById('ordersModal') || document.getElementById('order-details-modal');
-  if (modal) {
-    modal.classList.remove('hidden');
-    // Rellenar datos de la orden aquí...
-  }
-};
-  modal.innerHTML = `
+  modalContainer.innerHTML = `
     <div class="bg-white rounded-xl shadow-xl max-w-md w-full p-6 relative">
       <button onclick="document.getElementById('orderDetailsModal').remove()" class="absolute top-3 right-3 text-gray-500 hover:text-black font-bold text-lg">&times;</button>
       <h3 class="text-base font-bold text-gray-800 mb-3">Detalles de Orden: ${order.orderId || order.order_id}</h3>
       <div class="space-y-2 text-xs text-gray-600 mb-4">
-        <p><strong>Cliente:</strong> ${order.clientName || order.client_name}</p>
+        <p><strong>Cliente:</strong> ${order.clientName || order.client_name || 'Cliente'}</p>
         <p><strong>Tipo de Entrega:</strong> ${order.deliveryType || order.delivery_type || 'Retiro'}</p>
-        <p><strong>Estado:</strong> <span class="px-2 py-0.5 bg-green-100 text-green-700 rounded-full font-semibold">${order.status}</span></p>
+        <p><strong>Estado:</strong> <span class="px-2 py-0.5 bg-green-100 text-green-700 rounded-full font-semibold">${order.status || 'Procesado'}</span></p>
         <p><strong>Referencia de Pago:</strong> ${order.paymentReference || order.payment_reference || 'N/A'}</p>
       </div>
       <div class="border-t pt-2 mb-4">
@@ -1702,4 +1614,6 @@ window.displayOrderDetails = function(orderIdOrIdentifier) {
       <button onclick="document.getElementById('orderDetailsModal').remove()" class="w-full bg-gray-800 text-white py-2 rounded-lg text-xs font-semibold hover:bg-black transition">Cerrar</button>
     </div>
   `;
+
+  document.body.appendChild(modalContainer);
 };
