@@ -317,17 +317,27 @@ window.handleCreateProduct = async (e) => {
     if (client) {
       const { data, error } = await client.from('products').insert([newProduct]).select();
       if (error) return alert("Error en Supabase: " + error.message);
-      if (data && data.length > 0) window.products.push(data[0]);
+      if (data && data.length > 0) {
+        // Asegurarnos de agregar el objeto que devuelve Supabase (con su ID real) al arreglo global
+        window.products.push(data[0]);
+      }
     } else {
       newProduct.id = Date.now().toString();
       window.products.push(newProduct);
     }
+    
     alert("✅ Producto guardado exitosamente con Supabase Storage.");
   }
 
+  // 4. Forzar la actualización visual del inventario y la tienda
+  if (typeof window.fetchProductsFromSupabase === 'function') {
+    await window.fetchProductsFromSupabase(); // Vuelve a consultar la base de datos para sincronizar todo
+  } else {
+    renderStoreProducts();
+    if (typeof filterAdminView === 'function') filterAdminView();
+  }
+
   saveState();
-  renderStoreProducts();
-  filterAdminView();
   document.getElementById('adminProductForm').reset();
   if (activeAdminBranch !== "ALL") pBranchSelect.value = activeAdminBranch;
 };
