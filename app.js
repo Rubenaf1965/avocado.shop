@@ -1484,3 +1484,50 @@ window.changeOrderStatus = async function(orderId, newStatus) {
   if (typeof renderOrders === 'function') renderOrders();
   if (typeof updateDashboardMetrics === 'function') updateDashboardMetrics();
 };
+window.crearOrden = async function(nuevaOrdenData) {
+  const client = getSupabaseClient();
+  
+  const orderId = nuevaOrdenData.orderId || 'AVO-' + Math.floor(100000 + Math.random() * 900000);
+  const totalUSD = nuevaOrdenData.total || nuevaOrdenData.items.reduce((acc, i) => acc + (i.price * i.qty), 0);
+  const currentBcv = getActiveBcvRate();
+  const totalBS = totalUSD * currentBcv;
+
+  const newOrder = {
+    orderId: orderId,
+    clientName: nuevaOrdenData.clientName || 'Cliente General',
+    deliveryType: nuevaOrdenData.deliveryType || 'Retiro en Sucursal',
+    branch: nuevaOrdenData.branch || 'San Félix',
+    user: nuevaOrdenData.user || 'cliente@avocado.com',
+    items: nuevaOrdenData.items || [...window.cart],
+    total: totalUSD,
+    paymentReference: nuevaOrdenData.paymentReference || 'N/A',
+    status: nuevaOrdenData.status || 'En Verificación',
+    createdAt: new Date().toISOString()
+  };
+
+  if (client) {
+    try {
+      const { data, error } = await client.from('orders').insert([newOrder]).select();
+      if (error) {
+        console.error("Error al guardar la orden en Supabase:", error.message);
+        alert("Error al registrar la orden en la base de datos.");
+        return null;
+      }
+      if (data && data.length > 0 && data[0].id) {
+        newOrder.id = data[0].id;
+      }
+    } catch (err) {
+      console.error("Excepción al conectar con Supabase para crear orden:", err);
+    }
+  }
+
+  window.orders = window.orders || [];
+  window.orders.push(newOrder);
+  saveState();
+
+  if (typeof filterAdminView === 'function') {
+    filterAdminView();
+  }
+
+  return newOrder;
+};
