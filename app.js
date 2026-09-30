@@ -504,7 +504,7 @@ window.cancelPurchase = () => {
   document.getElementById('cartModal').classList.add('hidden');
 };
 
-window.processCheckout = () => {
+window.processCheckout = async () => {
   if (window.cart.length === 0) return alert('El carrito está vacío.');
   const buyerName = document.getElementById('buyerName').value.trim();
   const refNum = document.getElementById('pmReference').value.trim();
@@ -523,7 +523,7 @@ window.processCheckout = () => {
   const deliveryTypeLabel = deliveryOption === 'delivery' ? 'Delivery' : 'Retiro en Sucursal';
   const branchOrAddress = deliveryOption === 'delivery' ? deliveryAddress : selectedBranch;
 
-  const newOrder = {
+  const nuevaOrdenData = {
     orderId,
     clientName: buyerName,
     deliveryType: deliveryTypeLabel,
@@ -532,13 +532,11 @@ window.processCheckout = () => {
     items: [...window.cart],
     total: totalUSD,
     paymentReference: refNum,
-    status: 'En Verificación',
-    createdAt: new Date().toISOString()
+    status: 'En Verificación'
   };
 
-  window.orders.push(newOrder);
-  saveState();
-  filterAdminView();
+  // Guardar en Supabase y sincronizar usando tu función centralizada
+  await window.crearOrden(nuevaOrdenData);
 
   let msgText = `¡Hola Avocado Shop! Orden #${orderId}\n`;
   msgText += `Cliente: ${buyerName}\n`;
@@ -1074,10 +1072,10 @@ function renderOrdersTable(filterBranch = activeAdminBranch) {
   }
 
   tbody.innerHTML = filtered.map(o => {
-    const realIndex = window.orders.findIndex(item => item.orderId === o.orderId);
     const isGlobalAccess = activeAdminBranch === "ALL";
     const currentStatus = o.status || 'En Verificación';
     const badgeClass = getStatusBadgeClass(currentStatus);
+    const identifier = o.id || o.orderId;
 
     return `
       <tr>
@@ -1087,7 +1085,7 @@ function renderOrdersTable(filterBranch = activeAdminBranch) {
         <td class="p-2.5 font-bold">$${o.total.toFixed(2)}</td>
         <td class="p-2.5">#${o.paymentReference}</td>
         <td class="p-2.5">
-          <select onchange="changeOrderStatus(${realIndex}, this.value)" class="text-[10px] font-bold rounded-lg px-2 py-1 outline-none cursor-pointer ${badgeClass}">
+          <select onchange="changeOrderStatus('${identifier}', this.value)" class="text-[10px] font-bold rounded-lg px-2 py-1 outline-none cursor-pointer ${badgeClass}">
             <option value="En Verificación" ${currentStatus === 'En Verificación' ? 'selected' : ''}>En Verificación</option>
             <option value="Procesado" ${currentStatus === 'Procesado' ? 'selected' : ''}>Procesado</option>
             <option value="Entregado" ${currentStatus === 'Entregado' ? 'selected' : ''}>Entregado</option>
@@ -1098,13 +1096,12 @@ function renderOrdersTable(filterBranch = activeAdminBranch) {
           <button onclick="viewOrderModal('${o.orderId}')" class="bg-emerald-600 text-white px-2.5 py-1 rounded-md text-[10px] font-bold hover:bg-emerald-700 transition flex items-center gap-1">
             👁️ Ver / Facturar
           </button>
-          ${isGlobalAccess ? `<button onclick="deleteOrder(${realIndex})" title="Eliminar Orden" class="bg-red-50 text-red-600 hover:bg-red-100 px-2 py-1 rounded-md text-[10px] font-bold">🗑️</button>` : ''}
+          ${isGlobalAccess ? `<button onclick="deleteOrder('${identifier}')" title="Eliminar Orden" class="bg-red-50 text-red-600 hover:bg-red-100 px-2 py-1 rounded-md text-[10px] font-bold">🗑️</button>` : ''}
         </td>
       </tr>
     `;
   }).join('');
 }
-
 function getStatusBadgeClass(status) {
   switch (status) {
     case 'Procesado':
@@ -1427,10 +1424,9 @@ window.viewOrderModal = function(orderId) {
   }
 };
 
-window.deleteOrder = async function(orderId) {
-  // Validar si el ID es un número '0' o inválido
-  if (!orderId || orderId === 0 || orderId === "0") {
-    alert("Error: El ID de la orden no es válido.");
+window.deleteOrder = async function(orderIdOrIdentifier) {
+  if (!orderIdOrIdentifier) {
+    alert("Error: Identificador de orden inválido.");
     return;
   }
 
@@ -1438,7 +1434,11 @@ window.deleteOrder = async function(orderId) {
 
   const client = getSupabaseClient();
   if (client) {
-    const { error } = await client.from('orders').delete().eq('id', orderId);
+    // Determinar si es un ID de Supabase (UUID o número largo) o un código AVO-XXXXXX
+    const isNumericOrUuid = !String(orderIdOrIdentifier).startsWith('AVO-');
+    const queryField = isNumericOrUuid ? 'id' : 'orderId';
+
+    const { error } = await client.from('orders').delete().eq(queryField, orderIdOrIdentifier);
     if (error) {
       alert("Error al eliminar la orden en Supabase: " + error.message);
       return;
@@ -1446,29 +1446,27 @@ window.deleteOrder = async function(orderId) {
   }
 
   // Remover del arreglo local
-  window.orders = (window.orders || []).filter(o => o.id !== orderId && o.code !== orderId);
+  window.orders = (window.orders || []).filter(o => o.id !== orderIdOrIdentifier && o.orderId !== orderIdOrIdentifier);
+  saveState();
   
-  if (typeof renderOrders === 'function') renderOrders();
-  if (typeof updateDashboardMetrics === 'function') updateDashboardMetrics();
+  if (typeof filterAdminView === 'function') filterAdminView();
   alert("🗑️ Orden eliminada exitosamente.");
 };
-window.changeOrderStatus = async function(orderId, newStatus) {
+
+window.changeOrderStatus = async function(orderIdOrIdentifier, newStatus) {
   const client = getSupabaseClient();
   
-  // Encontrar la orden localmente
-  const order = (window.orders || []).find(o => o.id === orderId || o.code === orderId);
+  const order = (window.orders || []).find(o => o.id == orderIdOrIdentifier || o.orderId == orderIdOrIdentifier);
   if (order) {
     order.status = newStatus;
 
-    // Si la orden cambia a procesada/facturada, descontar inventario automáticamente
     if (newStatus === 'Procesado' || newStatus === 'Completado') {
       if (order.items && Array.isArray(order.items)) {
         for (let item of order.items) {
           if (client) {
-            // Consultar stock actual en Supabase
             const { data: prodData } = await client.from('products').select('stock').eq('id', item.id).single();
             if (prodData) {
-              const nuevoStock = Math.max(0, prodData.stock - (item.quantity || 1));
+              const nuevoStock = Math.max(0, prodData.stock - (item.qty || item.quantity || 1));
               await client.from('products').update({ stock: nuevoStock }).eq('id', item.id);
             }
           }
@@ -1477,13 +1475,16 @@ window.changeOrderStatus = async function(orderId, newStatus) {
     }
 
     if (client) {
-      await client.from('orders').update({ status: newStatus }).eq('id', orderId);
+      const isNumericOrUuid = !String(orderIdOrIdentifier).startsWith('AVO-');
+      const queryField = isNumericOrUuid ? 'id' : 'orderId';
+      await client.from('orders').update({ status: newStatus }).eq(queryField, orderIdOrIdentifier);
     }
+    saveState();
   }
 
-  if (typeof renderOrders === 'function') renderOrders();
-  if (typeof updateDashboardMetrics === 'function') updateDashboardMetrics();
+  if (typeof filterAdminView === 'function') filterAdminView();
 };
+
 window.crearOrden = async function(nuevaOrdenData) {
   const client = getSupabaseClient();
   
