@@ -1294,6 +1294,22 @@ window.displayInventoryScreen = async function() {
     productos = window.products || [];
   }
 
+  // ==========================================
+  // FILTRO DE SUCURSALES INCORPORADO
+  // ==========================================
+  const sucursalActiva = localStorage.getItem('currentBranch') || window.currentBranch || 'Todas';
+
+  const productosFiltrados = productos.filter(producto => {
+    // Si la sucursal seleccionada es "Todas", "ALL" o similar, no filtramos
+    if (!sucursalActiva || sucursalActiva === 'Todas' || sucursalActiva === 'Todas las Sucursales' || sucursalActiva === 'ALL') {
+      return true;
+    }
+    // Comparamos el campo de la sucursal del producto (adaptado a 'branch' o 'sucursal')
+    const branchField = producto.branch || producto.sucursal || '';
+    return String(branchField).trim().toLowerCase() === String(sucursalActiva).trim().toLowerCase();
+  });
+  // ==========================================
+
   let modal = document.getElementById('inventoryReportModal') || 
               document.getElementById('inventoryScreenModal') || 
               document.getElementById('modalReporteInventario');
@@ -1317,7 +1333,8 @@ window.displayInventoryScreen = async function() {
   let totalUnidades = 0;
   const tasaBcv = window.currentBcvRate || getActiveBcvRate();
 
-  productos.forEach(prod => {
+  // A partir de aquí utilizamos 'productosFiltrados' para generar las filas de la tabla/reporte
+  productosFiltrados.forEach(prod => {
     const stockVal = parseInt(prod.stock || 0);
     totalUnidades += stockVal;
     const precioUsd = parseFloat(prod.price || 0);
@@ -1328,7 +1345,7 @@ window.displayInventoryScreen = async function() {
         <td style="padding: 10px;">${prod.sku || 'N/A'}</td>
         <td style="padding: 10px;">${prod.name}</td>
         <td style="padding: 10px;">${prod.category}</td>
-        <td style="padding: 10px;">${prod.branch}</td>
+        <td style="padding: 10px;">${prod.branch || prod.sucursal || 'N/A'}</td>
         <td style="padding: 10px;">$${precioUsd.toFixed(2)}</td>
         <td style="padding: 10px;">Bs. ${precioBs.toFixed(2)}</td>
         <td style="padding: 10px; font-weight: bold;">${stockVal}</td>
@@ -1347,7 +1364,7 @@ window.displayInventoryScreen = async function() {
         el.innerText = `Tasa BCV: Bs. ${tasaBcv}`;
       }
       if (el.innerText.includes('Total Productos:')) {
-        el.innerHTML = `Total Productos: <b>${productos.length}</b> &nbsp;&nbsp;&nbsp;&nbsp; Unidades Totales: <b>${totalUnidades}</b>`;
+        el.innerHTML = `Total Productos: <b>${productosFiltrados.length}</b> &nbsp;&nbsp;&nbsp;&nbsp; Unidades Totales: <b>${totalUnidades}</b>`;
       }
     }
   });
@@ -1376,7 +1393,6 @@ window.displayInventoryScreen = async function() {
   modal.style.display = 'block';
   modal.classList.remove('hidden');
 };
-
 // ==========================================
 // GESTIÓN DE ÓRDENES Y FACTURACIÓN
 // ==========================================
@@ -1575,13 +1591,21 @@ window.displayOrderDetails = function(orderIdOrIdentifier) {
     return;
   }
 
+  // Obtener la tasa BCV actual (si está definida globalmente en tu app, ej: window.bcvRate o un valor por defecto)
+  const bcvRate = window.bcvRate || 859.06; // Puedes ajustarlo según tu variable de tasa
+  const totalUSD = Number(order.total || 0);
+  const totalBs = totalUSD * bcvRate;
+
   const itemsList = order.items || order.items_json || [];
-  const itemsHtml = Array.isArray(itemsList) && itemsList.length > 0 ? itemsList.map(item => `
-    <tr class="border-b border-slate-100">
-      <td class="p-2.5">${item.name || item.product_name || 'Producto'} (x${item.qty || item.quantity || 1})</td>
-      <td class="p-2.5 text-right font-medium">$${(Number(item.price || 0) * Number(item.qty || item.quantity || 1)).toFixed(2)}</td>
-    </tr>
-  `).join('') : '<tr><td colspan="2" class="p-2.5 text-xs text-gray-500 text-center">Sin detalles de productos</td></tr>';
+  const itemsHtml = Array.isArray(itemsList) && itemsList.length > 0 ? itemsList.map(item => {
+    const itemSubtotal = (Number(item.price || 0) * Number(item.qty || item.quantity || 1));
+    return `
+      <tr class="border-b border-slate-100">
+        <td class="p-2.5">${item.name || item.product_name || 'Producto'} (x${item.qty || item.quantity || 1})</td>
+        <td class="p-2.5 text-right font-medium">$${itemSubtotal.toFixed(2)}</td>
+      </tr>
+    `;
+  }).join('') : '<tr><td colspan="2" class="p-2.5 text-xs text-gray-500 text-center">Sin detalles de productos</td></tr>';
 
   const existingModal = document.getElementById('orderDetailsModal');
   if (existingModal) existingModal.remove();
@@ -1602,9 +1626,12 @@ window.displayOrderDetails = function(orderIdOrIdentifier) {
       <!-- Cuerpo de la Factura / Orden (Se imprime esta sección) -->
       <div class="p-6 space-y-4 text-slate-700 print:p-8">
         
-        <!-- Encabezado para impresión (Solo visible al imprimir) -->
+        <!-- Encabezado para impresión con el Aguacate -->
         <div class="hidden print:block text-center mb-6">
-          <h1 class="text-2xl font-bold text-slate-900">Avocado Shop</h1>
+          <div class="flex items-center justify-center gap-2">
+            <span class="text-2xl">🥑</span>
+            <h1 class="text-2xl font-bold text-slate-900">Avocado Shop</h1>
+          </div>
           <p class="text-sm text-slate-500">Insumos de uñas, cejas y pestañas</p>
           <p class="text-xs text-slate-400 mt-1">Comprobante de Venta / Factura</p>
           <hr class="my-3 border-slate-200" />
@@ -1643,25 +1670,39 @@ window.displayOrderDetails = function(orderIdOrIdentifier) {
           </div>
         </div>
 
-        <!-- Total a Pagar -->
-        <div class="flex justify-between items-center pt-2 border-t border-slate-200 text-base font-bold text-slate-900">
-          <span>Total a Pagar:</span>
-          <span class="text-emerald-600">$${Number(order.total || 0).toFixed(2)}</span>
+        <!-- Totales (Dólares y Bolívares) -->
+        <div class="pt-2 border-t border-slate-200 space-y-1 text-right">
+          <div class="flex justify-between items-center text-base font-bold text-slate-900">
+            <span>Total a Pagar:</span>
+            <span class="text-emerald-600">$${totalUSD.toFixed(2)}</span>
+          </div>
+          <div class="flex justify-between items-center text-xs font-medium text-slate-500">
+            <span>Equivalente en Bs. (Tasa BCV: ${bcvRate}):</span>
+            <span>Bs. ${totalBs.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+          </div>
         </div>
 
       </div>
 
       <!-- Pie de Página / Botones de Acción (Oculto al imprimir) -->
-      <div class="bg-slate-50 px-6 py-4 flex justify-end gap-3 border-t border-slate-200 print:hidden">
-        <button onclick="document.getElementById('orderDetailsModal').remove()" class="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 font-medium rounded-lg text-sm transition">
-          Cerrar
+      <div class="bg-slate-50 px-6 py-4 flex items-center justify-between border-t border-slate-200 print:hidden">
+        <!-- Botón de Eliminar Orden -->
+        <button onclick="if(confirm('¿Estás seguro de eliminar esta orden?')) { deleteOrder('${order.id || order.orderId}'); document.getElementById('orderDetailsModal').remove(); }" class="px-3 py-2 bg-rose-50 hover:bg-rose-100 text-rose-600 font-medium rounded-lg text-xs flex items-center gap-1 transition">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+          Eliminar Orden
         </button>
-        <button onclick="window.print()" class="px-4 py-2 bg-emerald-700 hover:bg-emerald-800 text-white font-medium rounded-lg text-sm flex items-center gap-2 transition shadow-sm">
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M6 9V2h12v7M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2m-4 0v4H8v-4m4-8h4m-4 4h4" />
-          </svg>
-          Generar Factura e Imprimir
-        </button>
+
+        <div class="flex gap-3">
+          <button onclick="document.getElementById('orderDetailsModal').remove()" class="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 font-medium rounded-lg text-sm transition">
+            Cerrar
+          </button>
+          <button onclick="window.print()" class="px-4 py-2 bg-emerald-700 hover:bg-emerald-800 text-white font-medium rounded-lg text-sm flex items-center gap-2 transition shadow-sm">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M6 9V2h12v7M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2m-4 0v4H8v-4m4-8h4m-4 4h4" />
+            </svg>
+            Generar Factura e Imprimir
+          </button>
+        </div>
       </div>
 
     </div>
