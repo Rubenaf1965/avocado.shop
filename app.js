@@ -1303,16 +1303,17 @@ window.displayInventoryScreen = async function() {
   }
 
   // ==========================================
-  // FILTRO DE SUCURSALES INCORPORADO
+  // FILTRO ESTRICTO POR SUCURSAL ACTIVA
   // ==========================================
-  const sucursalActiva = localStorage.getItem('currentBranch') || window.currentBranch || 'Todas';
+  // Si activeAdminBranch es "ALL" (Global), ve todo. Si es una sucursal específica, se filtra de forma estricta.
+  const sucursalActiva = (typeof activeAdminBranch !== 'undefined' && activeAdminBranch) ? activeAdminBranch : (localStorage.getItem('currentBranch') || 'ALL');
 
   const productosFiltrados = productos.filter(producto => {
-    // Si la sucursal seleccionada es "Todas", "ALL" o similar, no filtramos
+    // Si la sucursal seleccionada es "ALL", "Todas" o similar, mostramos todo
     if (!sucursalActiva || sucursalActiva === 'Todas' || sucursalActiva === 'Todas las Sucursales' || sucursalActiva === 'ALL') {
       return true;
     }
-    // Comparamos el campo de la sucursal del producto (adaptado a 'branch' o 'sucursal')
+    // De lo contrario, filtramos estrictamente por la sucursal en sesión
     const branchField = producto.branch || producto.sucursal || '';
     return String(branchField).trim().toLowerCase() === String(sucursalActiva).trim().toLowerCase();
   });
@@ -1341,7 +1342,6 @@ window.displayInventoryScreen = async function() {
   let totalUnidades = 0;
   const tasaBcv = window.currentBcvRate || getActiveBcvRate();
 
-  // A partir de aquí utilizamos 'productosFiltrados' para generar las filas de la tabla/reporte
   productosFiltrados.forEach(prod => {
     const stockVal = parseInt(prod.stock || 0);
     totalUnidades += stockVal;
@@ -1387,6 +1387,20 @@ window.displayInventoryScreen = async function() {
       };
     }
   });
+
+  const btnX = modal.querySelector('button.absolute, button svg, .close-modal');
+  if (btnX) {
+    const closeBtnElement = btnX.closest('button') || btnX;
+    closeBtnElement.onclick = (e) => {
+      e.preventDefault();
+      modal.style.display = 'none';
+      modal.classList.add('hidden');
+    };
+  }
+
+  modal.style.display = 'block';
+  modal.classList.remove('hidden');
+};
 
   const btnX = modal.querySelector('button.absolute, button svg, .close-modal');
   if (btnX) {
