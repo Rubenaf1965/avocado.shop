@@ -1302,22 +1302,16 @@ window.displayInventoryScreen = async function() {
     productos = window.products || [];
   }
 
-  // ==========================================
-  // FILTRO ESTRICTO POR SUCURSAL ACTIVA
-  // ==========================================
-  // Si activeAdminBranch es "ALL" (Global), ve todo. Si es una sucursal específica, se filtra de forma estricta.
+  // Filtro estricto por sucursal activa
   const sucursalActiva = (typeof activeAdminBranch !== 'undefined' && activeAdminBranch) ? activeAdminBranch : (localStorage.getItem('currentBranch') || 'ALL');
 
   const productosFiltrados = productos.filter(producto => {
-    // Si la sucursal seleccionada es "ALL", "Todas" o similar, mostramos todo
     if (!sucursalActiva || sucursalActiva === 'Todas' || sucursalActiva === 'Todas las Sucursales' || sucursalActiva === 'ALL') {
       return true;
     }
-    // De lo contrario, filtramos estrictamente por la sucursal en sesión
     const branchField = producto.branch || producto.sucursal || '';
     return String(branchField).trim().toLowerCase() === String(sucursalActiva).trim().toLowerCase();
   });
-  // ==========================================
 
   let modal = document.getElementById('inventoryReportModal') || 
               document.getElementById('inventoryScreenModal') || 
@@ -1401,7 +1395,6 @@ window.displayInventoryScreen = async function() {
   modal.style.display = 'block';
   modal.classList.remove('hidden');
 };
-
   const btnX = modal.querySelector('button.absolute, button svg, .close-modal');
   if (btnX) {
     const closeBtnElement = btnX.closest('button') || btnX;
@@ -1415,6 +1408,7 @@ window.displayInventoryScreen = async function() {
   modal.style.display = 'block';
   modal.classList.remove('hidden');
 };
+
 // ==========================================
 // GESTIÓN DE ÓRDENES Y FACTURACIÓN
 // ==========================================
