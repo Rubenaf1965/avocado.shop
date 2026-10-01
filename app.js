@@ -1134,7 +1134,16 @@ function updateBranchStats() {
   const ids = ["sanfelix", "altavista1", "altavista2"];
 
   branches.forEach((b, index) => {
-    const branchSales = window.sellers.filter(s => s.branch === b).reduce((acc, s) => acc + s.sales, 0);
+    // Sumar las ventas basándose en las órdenes reales de la sucursal (excluyendo canceladas)
+    const branchOrders = (window.orders || []).filter(o => {
+      const orderBranch = o.branch || '';
+      const deliveryType = o.deliveryType || o.delivery_type || '';
+      const belongsToBranch = orderBranch === b || deliveryType.includes(b);
+      const isNotCancelled = o.status !== "Cancelado";
+      return belongsToBranch && isNotCancelled;
+    });
+
+    const branchSales = branchOrders.reduce((acc, o) => acc + Number(o.total || 0), 0);
     const branchStock = window.products.filter(p => p.branch === b).reduce((acc, p) => acc + p.stock, 0);
 
     const statElem = document.getElementById(`stat-${ids[index]}`);
@@ -1144,19 +1153,18 @@ function updateBranchStats() {
     if (stockElem) stockElem.textContent = `Stock: ${branchStock} unidades`;
   });
 
-  const deliveryOrders = window.orders.filter(o => 
-    (o.deliveryType === "Delivery" || o.deliveryType === "Envío por Delivery") &&
-    o.status !== "Cancelado"
-  );
+  const deliveryOrders = window.orders.filter(o => {
+    const dType = o.deliveryType || o.delivery_type || '';
+    return (dType.includes("Delivery") || dType.includes("Envío")) && o.status !== "Cancelado";
+  });
   
-  const totalDeliverySales = deliveryOrders.reduce((acc, o) => acc + (o.total || 0), 0);
+  const totalDeliverySales = deliveryOrders.reduce((acc, o) => acc + Number(o.total || 0), 0);
   const statDeliveryElem = document.getElementById('stat-delivery');
   const countDeliveryElem = document.getElementById('count-delivery');
 
   if (statDeliveryElem) statDeliveryElem.textContent = `$${totalDeliverySales.toFixed(2)}`;
   if (countDeliveryElem) countDeliveryElem.textContent = `${deliveryOrders.length} pedido(s) registrado(s)`;
 }
-
 function setupFilters() {
   const searchInput = document.getElementById('searchInput');
   if (searchInput) {
