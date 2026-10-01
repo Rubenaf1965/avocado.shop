@@ -1392,9 +1392,6 @@ window.displayInventoryScreen = async function() {
     };
   }
 
-  modal.style.display = 'block';
-  modal.classList.remove('hidden');
-};
   const btnX = modal.querySelector('button.absolute, button svg, .close-modal');
   if (btnX) {
     const closeBtnElement = btnX.closest('button') || btnX;
@@ -1406,8 +1403,9 @@ window.displayInventoryScreen = async function() {
   }
 
   modal.style.display = 'block';
-  modal.classList.remove('hidden');
+  modal.classList.add('hidden');
 };
+
 
 // ==========================================
 // GESTIÓN DE ÓRDENES Y FACTURACIÓN
