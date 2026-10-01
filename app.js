@@ -1392,16 +1392,6 @@ window.displayInventoryScreen = async function() {
     };
   }
 
-  const btnX = modal.querySelector('button.absolute, button svg, .close-modal');
-  if (btnX) {
-    const closeBtnElement = btnX.closest('button') || btnX;
-    closeBtnElement.onclick = (e) => {
-      e.preventDefault();
-      modal.style.display = 'none';
-      modal.classList.add('hidden');
-    };
-  }
-
   modal.style.display = 'block';
   modal.classList.add('hidden');
 };
